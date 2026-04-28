@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FITNESS ADDICT UNISEX GYM | Gym Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            bullRed: '#DE1B22',
+            bullDark: '#0A0A0A',
+            bullSurface: '#141414',
+            bullBorder: '#232323',
+            bullText: '#EEEEEE',
+            bullMuted: '#888888',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 10px;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in-down {
+      animation: fadeInDown 0.3s ease-out forwards;
+    }
+    .animate-scale-in {
+      animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-bullDark text-white font-sans antialiased">
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

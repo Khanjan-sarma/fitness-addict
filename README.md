@@ -1,11 +1,67 @@
-<div align="center">
+# 🏋️ Fitness Addict Unisex Gym — Gym Management System
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+An internal gym management web app built for **Fitness Addict Unisex Gym** to manage members, track payments, and monitor revenue.
 
-  <h1>Built with AI Studio</h2>
+## Tech Stack
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- **Frontend:** React 19 + TypeScript
+- **Build:** Vite
+- **Styling:** TailwindCSS
+- **Backend:** Supabase (Auth + PostgreSQL)
+- **Hosting:** Vercel
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Features
 
-</div>
+- 🔐 **Secure Login** — Email/password auth via Supabase
+- 📊 **Dashboard** — KPI cards, membership alerts, finance summary, today's revenue
+- 👥 **Member Management** — Add, edit, renew, delete members with status tracking
+- 💰 **Finance** — Revenue charts, transaction table, CSV export
+- 📅 **Off-Day Calendar** — Mark gym closure dates with reasons
+- 🔍 **Search & Filter** — Search by name/phone + filter by Active/Due/Expired
+
+## Run Locally
+
+**Prerequisites:** Node.js 18+
+
+```bash
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:3000/`
+
+## Environment Variables (Optional)
+
+Create a `.env.local` file:
+
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## Deploy
+
+```bash
+npx vercel --prod
+```
+
+## Project Structure
+
+```
+├── App.tsx                 # Root component + routing
+├── index.tsx               # Entry point
+├── types.ts                # TypeScript interfaces
+├── components/
+│   └── Layout.tsx          # Sidebar + responsive shell
+├── pages/
+│   ├── Login.tsx           # Authentication
+│   ├── Dashboard.tsx       # KPI + alerts + finance summary
+│   ├── Members.tsx         # Member cards + renew/edit/payment modals
+│   ├── AddMember.tsx       # Member onboarding form
+│   ├── Finance.tsx         # Revenue analytics + transaction history
+│   └── OffDays.tsx         # Calendar for gym off-days
+├── services/
+│   └── supabase.ts         # Supabase client
+└── utils/
+    └── statusUtils.ts      # Membership status calculator
+```
