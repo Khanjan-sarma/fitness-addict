@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Dumbbell, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Dumbbell, Lock, User, AlertCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -15,8 +15,9 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    const loginEmail = email.includes('@') ? email : `${email}@humica.ai`;
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     });
 
@@ -47,22 +48,22 @@ export const Login: React.FC = () => {
           <form className="space-y-6" onSubmit={handleLogin}>
             <div>
               <label htmlFor="email" className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">
-                Email Address
+                Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-gray-400" />
+                  <User className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-11 pr-4 py-4 bg-bullDark border-none rounded-2xl text-sm font-bold text-white placeholder-gray-500 focus:ring-2 focus:ring-bullRed transition-all"
-                  placeholder="coach@bullfitness.com"
+                  placeholder="Humica"
                 />
               </div>
             </div>
@@ -102,7 +103,7 @@ export const Login: React.FC = () => {
                 disabled={loading}
                 className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-xl shadow-red-900/10 text-xs font-black uppercase tracking-widest text-white bg-bullRed hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-bullRed disabled:opacity-50 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
               >
-                {loading ? 'Authenticating...' : 'Access Command Center'}
+                {loading ? 'Authenticating...' : 'Access the Gym'}
               </button>
             </div>
           </form>
