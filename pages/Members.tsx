@@ -128,6 +128,8 @@ export const Members: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [editingPayment, setEditingPayment] = useState<{ id: string; amount: string; paid_on: string } | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [confirmingDeletePaymentId, setConfirmingDeletePaymentId] = useState<string | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -295,7 +297,7 @@ export const Members: React.FC = () => {
   };
 
   const deleteMember = async () => {
-    if (!selectedMember || !window.confirm(`Delete ${selectedMember.name} permanently?`)) return;
+    if (!selectedMember) return;
     setSubmitting(true);
     try {
       await supabase.from('payments').delete().eq('member_id', selectedMember.id);
@@ -303,6 +305,7 @@ export const Members: React.FC = () => {
       if (error) throw error;
       showToast('Member deleted.', 'success');
       setIsEditModalOpen(false);
+      setIsConfirmingDelete(false);
       fetchMembers();
     } catch (err) {
       showToast('Delete failed.', 'error');
@@ -312,12 +315,12 @@ export const Members: React.FC = () => {
   };
 
   const deletePayment = async (paymentId: string) => {
-    if (!window.confirm('Delete this payment record?')) return;
     try {
       const { error } = await supabase.from('payments').delete().eq('id', paymentId);
       if (error) throw error;
       setPayments(prev => prev.filter(p => p.id !== paymentId));
       showToast('Payment deleted.', 'success');
+      setConfirmingDeletePaymentId(null);
     } catch (err) {
       showToast('Failed to delete payment.', 'error');
     }
@@ -548,7 +551,7 @@ export const Members: React.FC = () => {
       )}
 
       {isEditModalOpen && selectedMember && (
-        <Modal onClose={() => { setIsEditModalOpen(false); setIsEditMode(false); }} title={isEditMode ? `Edit - ${selectedMember.name}` : selectedMember.name}>
+        <Modal onClose={() => { setIsEditModalOpen(false); setIsEditMode(false); setIsConfirmingDelete(false); }} title={isEditMode ? `Edit - ${selectedMember.name}` : selectedMember.name}>
           {!isEditMode ? (
             /* ===== VIEW MODE ===== */
             <div className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
@@ -704,20 +707,47 @@ export const Members: React.FC = () => {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-6">
-                <button
-                  type="button"
-                  onClick={deleteMember}
-                  className="flex-1 py-3 outline outline-1 outline-[#981014]/50 bg-[#981014]/10 text-bullRed rounded-md font-bold uppercase tracking-widest text-[11px] hover:bg-[#981014]/30 transition-colors"
-                >
-                  DELETE MEMBER
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-[2] py-3 bg-bullRed text-white rounded-md font-bold uppercase tracking-widest text-[11px] disabled:opacity-50 transition-colors hover:bg-red-700"
-                >
-                  {submitting ? 'SAVING...' : 'SAVE CHANGES'}
-                </button>
+                {isConfirmingDelete ? (
+                  <div className="w-full space-y-4 p-4 border border-red-500/30 bg-red-500/10 rounded-md">
+                    <p className="text-red-500 font-bold text-[13px] text-center leading-tight">
+                      Are you sure you want to permanently delete {selectedMember.name}? This cannot be undone.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDelete(false)}
+                        className="flex-1 py-3 outline outline-1 outline-bullBorder text-gray-400 rounded-md font-bold uppercase tracking-widest text-[11px] hover:text-white hover:bg-bullSurface transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deleteMember}
+                        disabled={submitting}
+                        className="flex-1 py-3 bg-red-600 outline outline-1 outline-red-600 text-white rounded-md font-bold uppercase tracking-widest text-[11px] hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      >
+                        {submitting ? 'DELETING...' : 'Yes, Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="flex-1 py-3 outline outline-1 outline-[#981014]/50 bg-[#981014]/10 text-bullRed rounded-md font-bold uppercase tracking-widest text-[11px] hover:bg-[#981014]/30 transition-colors"
+                    >
+                      DELETE MEMBER
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-[2] py-3 bg-bullRed text-white rounded-md font-bold uppercase tracking-widest text-[11px] disabled:opacity-50 transition-colors hover:bg-red-700"
+                    >
+                      {submitting ? 'SAVING...' : 'SAVE CHANGES'}
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           )}
@@ -771,6 +801,24 @@ export const Members: React.FC = () => {
                         </button>
                       </div>
                     </div>
+                  ) : confirmingDeletePaymentId === p.id ? (
+                    <div className="space-y-3">
+                      <p className="text-red-500 font-bold text-center text-[11px] uppercase tracking-widest">Delete this payment?</p>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setConfirmingDeletePaymentId(null)}
+                          className="px-3 py-1.5 rounded-md text-[10px] font-bold text-white outline outline-1 outline-bullBorder bg-bullDark hover:bg-[#1a1a1a] uppercase tracking-widest transition-all"
+                        >
+                          CANCEL
+                        </button>
+                        <button
+                          onClick={() => deletePayment(p.id)}
+                          className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest bg-red-600 outline outline-1 outline-red-600 text-white hover:bg-red-700 transition-all"
+                        >
+                          YES, DELETE
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -791,7 +839,7 @@ export const Members: React.FC = () => {
                           <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => deletePayment(p.id)}
+                          onClick={() => setConfirmingDeletePaymentId(p.id)}
                           className="p-1.5 rounded-lg text-gray-300 hover:text-bullRed hover:bg-red-50 transition-all"
                           title="Delete payment"
                         >
