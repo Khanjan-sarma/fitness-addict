@@ -61,41 +61,41 @@ const MemberCard: React.FC<{
   };
 
   return (
-    <div className="bg-bullSurface rounded-xl p-5 outline outline-1 outline-bullBorder relative overflow-hidden flex flex-col h-full cursor-pointer hover:outline-bullRed/50 transition-all" onClick={onView}>
+    <div className="bg-bullSurface rounded-xl p-4 outline outline-1 outline-bullBorder relative overflow-hidden flex flex-col h-full cursor-pointer hover:outline-bullRed/50 transition-all" onClick={onView}>
       {/* Decorative corner accent */}
-      <div className={`absolute top-0 right-0 w-12 h-12 rounded-bl-full ${status === 'Active' ? 'bg-emerald-500' : status === 'Due' ? 'bg-orange-500' : 'bg-red-500'}`} />
+      <div className={`absolute top-0 right-0 w-10 h-10 rounded-bl-full ${status === 'Active' ? 'bg-emerald-500' : status === 'Due' ? 'bg-orange-500' : 'bg-red-500'}`} />
 
-      <div className="flex items-start mb-6">
+      <div className="flex items-start mb-4">
         <div
-          className="w-12 h-12 rounded-lg bg-bullDark flex items-center justify-center font-black text-xl text-white outline outline-1 outline-bullBorder mr-4"
+          className="w-10 h-10 rounded-lg bg-bullDark flex items-center justify-center font-black text-lg text-white outline outline-1 outline-bullBorder mr-3"
         >
           {member.name.charAt(0)}
         </div>
-        <div className="flex-1 mt-1">
-          <h3 className="text-[15px] font-bold text-white leading-tight mb-2 truncate pr-6">{member.name}</h3>
+        <div className="flex-1 mt-0.5">
+          <h3 className="text-sm font-bold text-white leading-tight mb-1 truncate pr-6">{member.name}</h3>
           <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusColors[status as keyof typeof statusColors]}`}>
             {status}
           </span>
         </div>
       </div>
 
-      <div className="space-y-4 mb-6 mt-auto">
+      <div className="space-y-3 mb-5 mt-auto">
         <InfoLine icon={<Phone />} label="Phone" value={member.phone} />
         <InfoLine icon={<Calendar />} label="Expires" value={member.membership_end} />
         <InfoLine icon={<Target />} label="Goal" value={member.goal || 'Not set'} />
         <InfoLine icon={<Phone />} label="Emergency" value={member.emergency_contact || 'None'} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-bullBorder mt-auto">
+      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-bullBorder mt-auto">
         <button
           onClick={(e) => { e.stopPropagation(); onRenew(); }}
-          className="py-2.5 bg-bullRed text-white rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+          className="py-2 bg-bullRed text-white rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all flex items-center justify-center gap-2"
         >
           <RefreshCw className="h-3 w-3" /> Renew
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onPayments(); }}
-          className="py-2.5 bg-bullDark text-bullText outline outline-1 outline-bullBorder rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-bullSurface transition-all flex items-center justify-center gap-2"
+          className="py-2 bg-bullDark text-bullText outline outline-1 outline-bullBorder rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-bullSurface transition-all flex items-center justify-center gap-2"
         >
           <Receipt className="h-3 w-3 opacity-60" /> Payments
         </button>
@@ -420,7 +420,7 @@ export const Members: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bullRed"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
           {filteredMembers.length > 0 ? (
             filteredMembers.map((member) => (
               <MemberCard
