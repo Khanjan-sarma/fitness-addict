@@ -177,7 +177,7 @@ export const AddMember: React.FC = () => {
         member_id: memberData.id,
         plan_name: getPlanName(duration),
         amount: Number(totalAmount),
-        payment_date: today,
+        payment_date: formData.join_date,
         payment_method: paymentMethod
       }]);
 
