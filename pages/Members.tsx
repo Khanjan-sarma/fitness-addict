@@ -5,7 +5,7 @@ import { Member } from '../types';
 import { calculateStatus } from '../utils/statusUtils';
 import {
   Search, UserPlus, Edit2, RefreshCw, X, Receipt,
-  Trash2, CheckCircle, AlertCircle, Users, Phone,
+  Trash2, CheckCircle, AlertCircle, Users, Phone, CreditCard,
   Calendar, Target, Activity, DollarSign, Maximize2,
   AlertTriangle, Dumbbell, HeartPulse, Eye
 } from 'lucide-react';
@@ -42,6 +42,15 @@ const Modal: React.FC<{ children: React.ReactNode, onClose: () => void, title: s
     </div>
   </div>
 );
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`; // Convert YYYY-MM-DD to DD/MM/YYYY
+  }
+  return dateString;
+}
 
 /**
  * MemberCard component for displaying member summary
@@ -80,10 +89,10 @@ const MemberCard: React.FC<{
       </div>
 
       <div className="space-y-3 mb-5 mt-auto">
+        <InfoLine icon={<CreditCard />} label="Member ID" value={member.member_id || member.id.split('-')[0].toUpperCase()} />
         <InfoLine icon={<Phone />} label="Phone" value={member.phone} />
-        <InfoLine icon={<Calendar />} label="Expires" value={member.membership_end} />
+        <InfoLine icon={<Calendar />} label="Expires" value={formatDate(member.membership_end)} />
         <InfoLine icon={<Target />} label="Goal" value={member.goal || 'Not set'} />
-        <InfoLine icon={<Phone />} label="Emergency" value={member.emergency_contact || 'None'} />
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-3 border-t border-bullBorder mt-auto">
@@ -557,6 +566,10 @@ export const Members: React.FC = () => {
             <div className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
               <div className="space-y-3">
                 <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">MEMBER ID</span>
+                  <span className="text-sm font-bold text-white">{selectedMember.member_id || selectedMember.id.split('-')[0].toUpperCase()}</span>
+                </div>
+                <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">FULL NAME</span>
                   <span className="text-sm font-bold text-white">{selectedMember.name}</span>
                 </div>
@@ -587,15 +600,15 @@ export const Members: React.FC = () => {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mb-1">JOIN DATE</p>
-                    <p className="text-sm font-bold text-white">{selectedMember.join_date}</p>
+                    <p className="text-sm font-bold text-white">{formatDate(selectedMember.join_date)}</p>
                   </div>
                   <div className="border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mb-1">START</p>
-                    <p className="text-sm font-bold text-white">{selectedMember.membership_start}</p>
+                    <p className="text-sm font-bold text-white">{formatDate(selectedMember.membership_start)}</p>
                   </div>
                   <div className="border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mb-1">END</p>
-                    <p className="text-sm font-bold text-white">{selectedMember.membership_end}</p>
+                    <p className="text-sm font-bold text-white">{formatDate(selectedMember.membership_end)}</p>
                   </div>
                 </div>
               </div>
@@ -610,6 +623,15 @@ export const Members: React.FC = () => {
             /* ===== EDIT MODE ===== */
             <form onSubmit={submitEdit} className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">MEMBER ID</label>
+                  <input
+                    type="text"
+                    value={selectedMember.member_id || ''}
+                    onChange={e => setSelectedMember({ ...selectedMember, member_id: e.target.value } as Member)}
+                    className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                  />
+                </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">FULL NAME</label>
                   <input
@@ -825,7 +847,7 @@ export const Members: React.FC = () => {
                         <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500"><DollarSign className="h-4 w-4" /></div>
                         <div>
                           <p className="text-sm font-black text-white">₹{p.amount}</p>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{p.payment_date}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{formatDate(p.payment_date)}</p>
                           {p.payment_method && <p className="text-[9px] font-bold text-bullRed uppercase tracking-widest mt-0.5">{p.payment_method}</p>}
                         </div>
                       </div>

@@ -3,6 +3,66 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { AlertCircle } from 'lucide-react';
 
+const CustomDateInput = ({ id, name, value, onChange, readOnly, required, className }: any) => {
+  const [displayValue, setDisplayValue] = useState('');
+
+  useEffect(() => {
+    if (value) {
+      const parts = value.split('-');
+      if (parts.length === 3) {
+        setDisplayValue(`${parts[2]}/${parts[1]}/${parts[0]}`); // DD/MM/YYYY
+      } else {
+        setDisplayValue(value);
+      }
+    } else {
+      setDisplayValue('');
+    }
+  }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/[^0-9]/g, '');
+    if (raw.length > 2) {
+      raw = raw.substring(0, 2) + '/' + raw.substring(2);
+    }
+    if (raw.length > 5) {
+      raw = raw.substring(0, 5) + '/' + raw.substring(5);
+    }
+    raw = raw.substring(0, 10);
+    setDisplayValue(raw);
+
+    if (raw.length === 10) {
+      const parts = raw.split('/');
+      if (parts.length === 3) {
+        const iso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        const d = new Date(iso);
+        if (!isNaN(d.getTime())) {
+          onChange({ target: { name, value: iso } } as any);
+        }
+      }
+    } else {
+      // Don't update parent state until full date is typed, unless clearing
+      if (raw.length === 0) {
+        onChange({ target: { name, value: '' } } as any);
+      }
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      placeholder="DD/MM/YYYY"
+      id={id}
+      name={name}
+      value={displayValue}
+      onChange={handleTextChange}
+      readOnly={readOnly}
+      required={required}
+      className={className}
+      maxLength={10}
+    />
+  );
+};
+
 export const AddMember: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -14,6 +74,7 @@ export const AddMember: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
 
   const [formData, setFormData] = useState({
+    member_id: '',
     name: '',
     phone: '',
     join_date: today,
@@ -89,18 +150,23 @@ export const AddMember: React.FC = () => {
 
     try {
       // 1. Insert Member
+      const insertData: any = {
+        name: formData.name,
+        phone: formData.phone,
+        join_date: formData.join_date,
+        membership_start: formData.membership_start,
+        membership_end: formData.membership_end,
+        goal: formData.goal,
+        emergency_contact: formData.emergency_contact || null,
+        pt_enquiry: ptEnquiry,
+        medical_condition: formData.medical_condition || null,
+      };
+      if (formData.member_id.trim()) {
+        insertData.member_id = formData.member_id.trim();
+      }
+
       const { data: memberData, error: insertError } = await supabase.from('members').insert([
-        {
-          name: formData.name,
-          phone: formData.phone,
-          join_date: formData.join_date,
-          membership_start: formData.membership_start,
-          membership_end: formData.membership_end,
-          goal: formData.goal,
-          emergency_contact: formData.emergency_contact || null,
-          pt_enquiry: ptEnquiry,
-          medical_condition: formData.medical_condition || null,
-        },
+        insertData,
       ]).select().single();
 
       if (insertError) throw insertError;
@@ -156,6 +222,23 @@ export const AddMember: React.FC = () => {
           <div className="space-y-6">
             <h3 className="text-sm font-black text-white border-b border-bullBorder pb-3 uppercase tracking-widest">PERSONAL INFORMATION</h3>
             <div className="grid grid-cols-1 gap-y-6 gap-x-8 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <label htmlFor="member_id" className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
+                  MEMBER ID
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="text"
+                    name="member_id"
+                    id="member_id"
+                    value={formData.member_id}
+                    onChange={handleChange}
+                    className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                    placeholder="E.G. BULL-001"
+                  />
+                </div>
+              </div>
+
               <div className="sm:col-span-1">
                 <label htmlFor="name" className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
                   FULL NAME <span className="text-bullRed">*</span>
@@ -296,8 +379,7 @@ export const AddMember: React.FC = () => {
                   JOIN DATE <span className="text-bullRed">*</span>
                 </label>
                 <div className="mt-1">
-                  <input
-                    type="date"
+                  <CustomDateInput
                     name="join_date"
                     id="join_date"
                     required
@@ -313,8 +395,7 @@ export const AddMember: React.FC = () => {
                   MEMBERSHIP START <span className="text-bullRed">*</span>
                 </label>
                 <div className="mt-1">
-                  <input
-                    type="date"
+                  <CustomDateInput
                     name="membership_start"
                     id="membership_start"
                     required
@@ -330,8 +411,7 @@ export const AddMember: React.FC = () => {
                   MEMBERSHIP END <span className="text-bullRed">*</span>
                 </label>
                 <div className="mt-1">
-                  <input
-                    type="date"
+                  <CustomDateInput
                     name="membership_end"
                     id="membership_end"
                     required

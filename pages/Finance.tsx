@@ -6,6 +6,17 @@ import {
   ArrowUpRight, BarChart3
 } from 'lucide-react';
 
+const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`; // Convert YYYY-MM-DD to DD/MM/YYYY
+  }
+  return dateString;
+}
+
 export const Finance: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,7 +220,7 @@ export const Finance: React.FC = () => {
                 <tr key={p.id} className="hover:bg-bullDark transition-colors">
                   <td className="px-6 py-5 whitespace-nowrap font-bold text-bullText text-sm">{p.members?.name || 'Unknown'}</td>
                   <td className="px-6 py-5 whitespace-nowrap text-sm font-medium text-bullMuted">{p.plan_name || '-'}</td>
-                  <td className="px-6 py-5 whitespace-nowrap text-sm text-bullMuted font-medium">{p.payment_date}</td>
+                  <td className="px-6 py-5 whitespace-nowrap text-sm text-bullMuted font-medium">{formatDate(p.payment_date)}</td>
                   <td className="px-6 py-5 whitespace-nowrap font-bold text-white">{formatCurrency(p.amount)}</td>
                   <td className="px-6 py-5 whitespace-nowrap">
                     <span className="px-2 py-1 bg-blue-900/30 text-[#4c84ff] rounded font-bold uppercase tracking-widest text-[9px] border border-blue-900/50">{p.payment_method || '-'}</span>

@@ -1,5 +1,6 @@
 export interface Member {
   id: string;
+  member_id?: string;
   name: string;
   phone: string;
   join_date: string;
