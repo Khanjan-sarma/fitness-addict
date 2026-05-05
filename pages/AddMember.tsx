@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { addMonthsClamped, toLocalIsoDate } from '../utils/dateUtils';
 import { AlertCircle } from 'lucide-react';
 
 const CustomDateInput = ({ id, name, value, onChange, readOnly, required, className }: any) => {
@@ -70,8 +71,9 @@ export const AddMember: React.FC = () => {
   const [duration, setDuration] = useState('1');
   const [totalAmount, setTotalAmount] = useState('2000');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [hasMedicalCondition, setHasMedicalCondition] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalIsoDate();
 
   const [formData, setFormData] = useState({
     member_id: '',
@@ -81,7 +83,6 @@ export const AddMember: React.FC = () => {
     membership_start: today,
     membership_end: '',
     goal: '',
-    emergency_contact: '',
     medical_condition: '',
   });
 
@@ -90,11 +91,8 @@ export const AddMember: React.FC = () => {
   // Auto-calculate the end date and total amount when duration or start date changes
   useEffect(() => {
     if (duration !== 'custom' && formData.membership_start) {
-      const startDate = new Date(formData.membership_start);
       const months = parseInt(duration, 10);
-
-      startDate.setMonth(startDate.getMonth() + months);
-      const newEndDate = startDate.toISOString().split('T')[0];
+      const newEndDate = addMonthsClamped(formData.membership_start, months);
 
       setFormData((prev) => ({
         ...prev,
@@ -138,7 +136,7 @@ export const AddMember: React.FC = () => {
       setError("Phone number must be exactly 10 digits.");
       return;
     }
-    if (new Date(formData.membership_end) <= new Date(formData.membership_start)) {
+    if (formData.membership_end <= formData.membership_start) {
       setError("Membership end date must be after the start date.");
       return;
     }
@@ -157,9 +155,8 @@ export const AddMember: React.FC = () => {
         membership_start: formData.membership_start,
         membership_end: formData.membership_end,
         goal: formData.goal,
-        emergency_contact: formData.emergency_contact || null,
         pt_enquiry: ptEnquiry,
-        medical_condition: formData.medical_condition || null,
+        medical_condition: hasMedicalCondition ? formData.medical_condition || null : null,
       };
       if (formData.member_id.trim()) {
         insertData.member_id = formData.member_id.trim();
@@ -298,23 +295,6 @@ export const AddMember: React.FC = () => {
               </div>
 
               <div className="sm:col-span-1">
-                <label htmlFor="emergency_contact" className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
-                  EMERGENCY CONTACT
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="tel"
-                    name="emergency_contact"
-                    id="emergency_contact"
-                    value={formData.emergency_contact}
-                    onChange={handleChange}
-                    className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
-                    placeholder="10 DIGIT NUMBER"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-1">
                 <label className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
                   PT ENQUIRY
                 </label>
@@ -331,22 +311,46 @@ export const AddMember: React.FC = () => {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="medical_condition" className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
+              <div className="sm:col-span-1">
+                <label className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
                   MEDICAL CONDITION
                 </label>
                 <div className="mt-1">
-                  <textarea
-                    name="medical_condition"
-                    id="medical_condition"
-                    value={formData.medical_condition}
-                    onChange={(e) => setFormData(prev => ({ ...prev, medical_condition: e.target.value }))}
-                    rows={2}
-                    className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all resize-none"
-                    placeholder="E.G. ASTHMA, KNEE INJURY..."
-                  />
+                  <label className="inline-flex items-center gap-3 cursor-pointer bg-[#0a0a0a] outline outline-1 outline-bullBorder rounded-md py-3 px-4 hover:bg-bullBorder transition-colors w-full">
+                    <input
+                      type="checkbox"
+                      checked={hasMedicalCondition}
+                      onChange={(e) => {
+                        setHasMedicalCondition(e.target.checked);
+                        if (!e.target.checked) {
+                          setFormData(prev => ({ ...prev, medical_condition: '' }));
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-bullBorder text-bullRed focus:ring-bullRed bg-[#141414]"
+                    />
+                    <span className="text-[11px] font-bold text-white uppercase tracking-widest">HAS MEDICAL CONDITION</span>
+                  </label>
                 </div>
               </div>
+
+              {hasMedicalCondition && (
+                <div className="sm:col-span-2">
+                  <label htmlFor="medical_condition" className="block text-[10px] font-bold text-bullMuted uppercase tracking-widest mb-2">
+                    CONDITION DETAILS
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      name="medical_condition"
+                      id="medical_condition"
+                      value={formData.medical_condition}
+                      onChange={(e) => setFormData(prev => ({ ...prev, medical_condition: e.target.value }))}
+                      rows={2}
+                      className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all resize-none"
+                      placeholder="E.G. ASTHMA, KNEE INJURY..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

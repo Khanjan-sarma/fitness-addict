@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { calculateStatus } from '../utils/statusUtils';
+import { toLocalIsoDate } from '../utils/dateUtils';
 import {
   Users, UserCheck, AlertCircle, XCircle,
   TrendingUp, CalendarDays,
@@ -114,7 +115,7 @@ export const Dashboard: React.FC = () => {
         let todayRev = 0;
         const now = new Date();
         const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = toLocalIsoDate(now);
 
         paymentsResponse.data.forEach((payment) => {
           const amt = Number(payment.amount) || 0;

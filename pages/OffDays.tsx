@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
+import { toLocalIsoDate } from '../utils/dateUtils';
 import { X, Trash2, CheckCircle, AlertCircle, Calendar, Clock } from 'lucide-react';
 
 // ── types ────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ function datesBetween(start: string, end: string): string[] {
   const cur = new Date(start + 'T00:00:00');
   const last = new Date(end + 'T00:00:00');
   while (cur <= last) {
-    dates.push(cur.toISOString().split('T')[0]);
+    dates.push(toLocalIsoDate(cur));
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
@@ -64,7 +65,7 @@ export const OffDays: React.FC = () => {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   const DAYS_OF_WEEK = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toLocalIsoDate();
 
   // ── data ──
   useEffect(() => { fetchOffDays(); }, []);

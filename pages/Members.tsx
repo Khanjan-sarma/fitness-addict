@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Member } from '../types';
 import { calculateStatus } from '../utils/statusUtils';
+import { addMonthsClamped, formatDate, toLocalIsoDate } from '../utils/dateUtils';
 import {
   Search, UserPlus, Edit2, RefreshCw, X, Receipt,
   Trash2, CheckCircle, AlertCircle, Users, Phone, CreditCard,
@@ -42,15 +43,6 @@ const Modal: React.FC<{ children: React.ReactNode, onClose: () => void, title: s
     </div>
   </div>
 );
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return 'N/A';
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`; // Convert YYYY-MM-DD to DD/MM/YYYY
-  }
-  return dateString;
-}
 
 /**
  * MemberCard component for displaying member summary
@@ -118,6 +110,7 @@ export const Members: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [goalFilter, setGoalFilter] = useState<string>('All');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Modal States
@@ -135,10 +128,14 @@ export const Members: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<{ id: string; amount: string; paid_on: string } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{ id: string; amount: string; paid_on: string; payment_method: string } | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [editHasMedicalCondition, setEditHasMedicalCondition] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [confirmingDeletePaymentId, setConfirmingDeletePaymentId] = useState<string | null>(null);
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('All');
+  const [paymentDateFilter, setPaymentDateFilter] = useState('All');
+  const [paymentSearchTerm, setPaymentSearchTerm] = useState('');
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -186,12 +183,36 @@ export const Members: React.FC = () => {
   const filteredMembers = members
     .filter(
       (member) => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        const visibleMemberId = member.member_id || member.id.split('-')[0].toUpperCase();
         const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          member.phone.includes(searchTerm);
+          member.phone.includes(searchTerm) ||
+          visibleMemberId.toLowerCase().includes(normalizedSearch) ||
+          member.id.toLowerCase().includes(normalizedSearch);
         const matchesStatus = statusFilter === 'All' || calculateStatus(member.membership_end) === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesGoal = goalFilter === 'All' || (member.goal || '') === goalFilter;
+        return matchesSearch && matchesStatus && matchesGoal;
       }
     );
+
+  const filteredPayments = payments.filter((payment) => {
+    const normalizedPaymentSearch = paymentSearchTerm.trim().toLowerCase();
+    const matchesMethod = paymentMethodFilter === 'All' || payment.payment_method === paymentMethodFilter;
+    const today = toLocalIsoDate();
+    const currentMonth = today.substring(0, 7);
+    const matchesDate =
+      paymentDateFilter === 'All' ||
+      (paymentDateFilter === 'Today' && payment.payment_date === today) ||
+      (paymentDateFilter === 'This Month' && payment.payment_date?.startsWith(currentMonth));
+    const matchesSearch =
+      !normalizedPaymentSearch ||
+      String(payment.amount ?? '').includes(normalizedPaymentSearch) ||
+      (payment.plan_name || '').toLowerCase().includes(normalizedPaymentSearch) ||
+      (payment.payment_date || '').toLowerCase().includes(normalizedPaymentSearch) ||
+      (payment.payment_method || '').toLowerCase().includes(normalizedPaymentSearch);
+
+    return matchesMethod && matchesDate && matchesSearch;
+  });
 
   // --- Modal Opening Handlers ---
   const handleRenew = (member: Member) => {
@@ -204,12 +225,16 @@ export const Members: React.FC = () => {
 
   const handleView = (member: Member) => {
     setSelectedMember(member);
+    setEditHasMedicalCondition(Boolean(member.medical_condition?.trim()));
     setIsEditMode(false);
     setIsEditModalOpen(true);
   };
 
   const handlePayments = async (member: Member) => {
     setSelectedMember(member);
+    setPaymentMethodFilter('All');
+    setPaymentDateFilter('All');
+    setPaymentSearchTerm('');
     setIsPaymentsModalOpen(true);
     setPaymentsLoading(true);
     try {
@@ -243,10 +268,7 @@ export const Members: React.FC = () => {
         }
         newEndDateStr = renewCustomDate;
       } else {
-        const currentEnd = new Date(selectedMember.membership_end);
-        const newEndDate = new Date(currentEnd);
-        newEndDate.setMonth(newEndDate.getMonth() + parseInt(renewDuration));
-        newEndDateStr = newEndDate.toISOString().split('T')[0];
+        newEndDateStr = addMonthsClamped(selectedMember.membership_end, parseInt(renewDuration, 10));
       }
 
       // Update membership_end, set renewal_reminder = false
@@ -266,7 +288,7 @@ export const Members: React.FC = () => {
           member_id: selectedMember.id,
           plan_name: `${renewDuration === 'custom' ? 'Custom' : renewDuration + (parseInt(renewDuration) === 1 ? ' Month' : ' Months')}`,
           amount: parseFloat(renewAmount),
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: toLocalIsoDate(),
           payment_method: renewPaymentMethod
         }]);
 
@@ -290,9 +312,13 @@ export const Members: React.FC = () => {
     if (!selectedMember) return;
     setSubmitting(true);
     try {
+      const memberToUpdate = {
+        ...selectedMember,
+        medical_condition: editHasMedicalCondition ? selectedMember.medical_condition || null : null,
+      };
       const { error } = await supabase
         .from('members')
-        .update(selectedMember)
+        .update(memberToUpdate)
         .eq('id', selectedMember.id);
       if (error) throw error;
       showToast('Member updated.', 'success');
@@ -340,11 +366,22 @@ export const Members: React.FC = () => {
     try {
       const { error } = await supabase
         .from('payments')
-        .update({ amount: parseFloat(editingPayment.amount), payment_date: editingPayment.paid_on })
+        .update({
+          amount: parseFloat(editingPayment.amount),
+          payment_date: editingPayment.paid_on,
+          payment_method: editingPayment.payment_method,
+        })
         .eq('id', editingPayment.id);
       if (error) throw error;
       setPayments(prev => prev.map(p =>
-        p.id === editingPayment.id ? { ...p, amount: parseFloat(editingPayment.amount), payment_date: editingPayment.paid_on } : p
+        p.id === editingPayment.id
+          ? {
+            ...p,
+            amount: parseFloat(editingPayment.amount),
+            payment_date: editingPayment.paid_on,
+            payment_method: editingPayment.payment_method,
+          }
+          : p
       ));
       setEditingPayment(null);
       showToast('Payment updated.', 'success');
@@ -392,7 +429,7 @@ export const Members: React.FC = () => {
           <input
             type="text"
             className="block w-full pl-11 pr-4 py-3 outline outline-1 outline-bullBorder rounded-xl bg-bullSurface text-white focus:outline-bullRed sm:text-sm font-medium transition-all"
-            placeholder="Search by name or phone..."
+            placeholder="Search by name, phone or member ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -417,6 +454,25 @@ export const Members: React.FC = () => {
               >
                 {dot}
                 {status.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {['All', 'Weight Loss', 'Muscle Gain', 'General Fitness'].map((goal) => {
+            const isActive = goalFilter === goal;
+
+            return (
+              <button
+                key={goal}
+                onClick={() => setGoalFilter(goal)}
+                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest outline outline-1 transition-colors ${
+                  isActive
+                    ? 'bg-bullRed text-white outline-bullRed'
+                    : 'bg-bullSurface text-bullMuted outline-bullBorder hover:bg-[#1a1a1a]'
+                }`}
+              >
+                {goal === 'All' ? 'ALL GOALS' : goal.toUpperCase()}
               </button>
             );
           })}
@@ -582,10 +638,6 @@ export const Members: React.FC = () => {
                   <span className="text-sm font-bold text-white">{selectedMember.goal || 'NOT SET'}</span>
                 </div>
                 <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">EMERGENCY CONTACT</span>
-                  <span className="text-sm font-bold text-white">{selectedMember.emergency_contact || 'NOT SET'}</span>
-                </div>
-                <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">PT ENQUIRY</span>
                   {selectedMember.pt_enquiry ? (
                     <span className="px-2.5 py-0.5 bg-[#981014]/20 text-[#ff4c4c] rounded font-bold uppercase tracking-widest border border-[#981014]/50 text-[10px]">YES</span>
@@ -595,7 +647,11 @@ export const Members: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">MEDICAL CONDITION</span>
-                  <span className="text-sm font-bold text-white max-w-[200px] truncate">{selectedMember.medical_condition || 'NONE'}</span>
+                  {selectedMember.medical_condition ? (
+                    <span className="text-sm font-bold text-white max-w-[200px] truncate">{selectedMember.medical_condition}</span>
+                  ) : (
+                    <span className="text-sm font-bold text-bullMuted">NO</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
@@ -667,16 +723,6 @@ export const Members: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">EMERGENCY CONTACT</label>
-                  <input
-                    type="text"
-                    value={selectedMember.emergency_contact || ''}
-                    onChange={e => setSelectedMember({ ...selectedMember, emergency_contact: e.target.value } as Member)}
-                    className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
-                    placeholder="10 DIGIT NUMBER"
-                  />
-                </div>
                 <div className="flex items-end col-span-2 sm:col-span-1">
                   <label className="flex items-center gap-3 w-full bg-[#0a0a0a] outline outline-1 outline-bullBorder rounded-md px-4 py-3 cursor-pointer hover:bg-bullBorder transition-colors h-[46px]">
                     <input
@@ -688,17 +734,35 @@ export const Members: React.FC = () => {
                     <span className="text-[10px] font-bold uppercase tracking-widest text-white">PT ENQUIRY</span>
                   </label>
                 </div>
+                <div className="flex items-end col-span-2 sm:col-span-1">
+                  <label className="flex items-center gap-3 w-full bg-[#0a0a0a] outline outline-1 outline-bullBorder rounded-md px-4 py-3 cursor-pointer hover:bg-bullBorder transition-colors h-[46px]">
+                    <input
+                      type="checkbox"
+                      checked={editHasMedicalCondition}
+                      onChange={e => {
+                        setEditHasMedicalCondition(e.target.checked);
+                        if (!e.target.checked) {
+                          setSelectedMember({ ...selectedMember, medical_condition: '' } as Member);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-bullBorder text-bullRed focus:ring-bullRed bg-[#141414]"
+                    />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">MEDICAL CONDITION</span>
+                  </label>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">MEDICAL CONDITION</label>
-                <textarea
-                  value={selectedMember.medical_condition || ''}
-                  onChange={e => setSelectedMember({ ...selectedMember, medical_condition: e.target.value } as Member)}
-                  className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all resize-none"
-                  rows={2}
-                  placeholder="E.G. ASTHMA, KNEE INJURY..."
-                />
-              </div>
+              {editHasMedicalCondition && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">CONDITION DETAILS</label>
+                  <textarea
+                    value={selectedMember.medical_condition || ''}
+                    onChange={e => setSelectedMember({ ...selectedMember, medical_condition: e.target.value } as Member)}
+                    className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all resize-none"
+                    rows={2}
+                    placeholder="E.G. ASTHMA, KNEE INJURY..."
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">JOIN DATE</label>
@@ -779,12 +843,47 @@ export const Members: React.FC = () => {
       {isPaymentsModalOpen && selectedMember && (
         <Modal onClose={() => setIsPaymentsModalOpen(false)} title={`Payment History - ${selectedMember.name}`}>
           <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar p-1">
+            <div className="grid grid-cols-1 gap-3 sticky top-0 z-10 bg-bullSurface pb-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-bullMuted" />
+                <input
+                  type="text"
+                  value={paymentSearchTerm}
+                  onChange={(e) => setPaymentSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-[11px] outline outline-1 outline-bullBorder rounded-md bg-[#0a0a0a] text-white focus:outline-bullRed transition-all font-bold tracking-widest"
+                  placeholder="SEARCH PAYMENTS..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={paymentMethodFilter}
+                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                  className="w-full text-[11px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest"
+                >
+                  <option value="All">ALL METHODS</option>
+                  <option value="cash">CASH</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">CARD</option>
+                  <option value="bank_transfer">BANK TRANSFER</option>
+                  <option value="other">OTHER</option>
+                </select>
+                <select
+                  value={paymentDateFilter}
+                  onChange={(e) => setPaymentDateFilter(e.target.value)}
+                  className="w-full text-[11px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest"
+                >
+                  <option value="All">ALL DATES</option>
+                  <option value="Today">TODAY</option>
+                  <option value="This Month">THIS MONTH</option>
+                </select>
+              </div>
+            </div>
             {paymentsLoading ? (
               <div className="py-10 text-center"><div className="animate-spin h-6 w-6 border-b-2 border-bullRed mx-auto rounded-full" /></div>
-            ) : payments.length === 0 ? (
+            ) : filteredPayments.length === 0 ? (
               <p className="text-center py-10 text-gray-400 font-bold uppercase text-[10px] tracking-widest">No payments found</p>
             ) : (
-              payments.map(p => (
+              filteredPayments.map(p => (
                 <div key={p.id} className="bg-[#0a0a0a] p-5 rounded-lg outline outline-1 outline-bullBorder">
                   {editingPayment && editingPayment.id === p.id ? (
                     <div className="space-y-3">
@@ -806,6 +905,20 @@ export const Members: React.FC = () => {
                             onChange={e => setEditingPayment({ ...editingPayment, paid_on: e.target.value })}
                             className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-2 px-2 bg-[#111] text-white focus:outline-bullRed transition-all"
                           />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">METHOD</label>
+                          <select
+                            value={editingPayment.payment_method}
+                            onChange={e => setEditingPayment({ ...editingPayment, payment_method: e.target.value })}
+                            className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#111] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest"
+                          >
+                            <option value="cash">CASH</option>
+                            <option value="upi">UPI</option>
+                            <option value="card">CARD</option>
+                            <option value="bank_transfer">BANK TRANSFER</option>
+                            <option value="other">OTHER</option>
+                          </select>
                         </div>
                       </div>
                       <div className="flex gap-2 justify-end">
@@ -854,7 +967,7 @@ export const Members: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">Success</span>
                         <button
-                          onClick={() => setEditingPayment({ id: p.id, amount: String(p.amount), paid_on: p.payment_date })}
+                          onClick={() => setEditingPayment({ id: p.id, amount: String(p.amount), paid_on: p.payment_date, payment_method: p.payment_method || 'cash' })}
                           className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-bullBorder transition-all"
                           title="Edit payment"
                         >

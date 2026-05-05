@@ -1,25 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
+import { formatDate } from '../utils/dateUtils';
 import {
   Landmark, DollarSign, TrendingUp,
-  CreditCard, Search, Download, Filter,
-  ArrowUpRight, BarChart3
+  CreditCard, Download, BarChart3, Search
 } from 'lucide-react';
-
-const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return 'N/A';
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`; // Convert YYYY-MM-DD to DD/MM/YYYY
-  }
-  return dateString;
-}
 
 export const Finance: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentSearchTerm, setPaymentSearchTerm] = useState('');
+  const [methodFilter, setMethodFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All');
   const [stats, setStats] = useState({
     total: 0,
     thisMonth: 0,
@@ -98,11 +90,32 @@ export const Finance: React.FC = () => {
   };
 
   const maxRevenue = Math.max(...monthlyData.map(d => d.revenue), 1);
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const currentMonthStr = todayStr.substring(0, 7);
+
+  const filteredPayments = payments.filter((payment) => {
+    const normalizedSearch = paymentSearchTerm.trim().toLowerCase();
+    const matchesMethod = methodFilter === 'All' || payment.payment_method === methodFilter;
+    const matchesDate =
+      dateFilter === 'All' ||
+      (dateFilter === 'Today' && payment.payment_date === todayStr) ||
+      (dateFilter === 'This Month' && payment.payment_date?.startsWith(currentMonthStr));
+    const matchesSearch =
+      !normalizedSearch ||
+      (payment.members?.name || '').toLowerCase().includes(normalizedSearch) ||
+      (payment.plan_name || '').toLowerCase().includes(normalizedSearch) ||
+      (payment.payment_method || '').toLowerCase().includes(normalizedSearch) ||
+      (payment.payment_date || '').toLowerCase().includes(normalizedSearch) ||
+      String(payment.amount ?? '').includes(normalizedSearch);
+
+    return matchesMethod && matchesDate && matchesSearch;
+  });
 
   const exportCSV = () => {
-    if (payments.length === 0) return;
+    if (filteredPayments.length === 0) return;
     const header = 'Member,Plan,Date,Amount,Payment Method\n';
-    const rows = payments.map(p =>
+    const rows = filteredPayments.map(p =>
       `"${p.members?.name || 'Unknown'}","${p.plan_name || '-'}",${p.payment_date},${p.amount},${p.payment_method || '-'}`
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
@@ -185,11 +198,44 @@ export const Finance: React.FC = () => {
       {/* Transactions Table */}
       <section className="bg-bullSurface rounded-xl outline outline-1 outline-bullBorder overflow-hidden mt-10">
         <div className="p-6 border-b border-bullBorder flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="text-sm font-black uppercase tracking-widest text-white">TRANSACTION HISTORY</h3>
-          <div className="flex gap-2">
-            <button className="p-2 outline outline-1 outline-bullBorder rounded-md text-bullMuted hover:text-white transition-colors">
-              <Filter className="h-4 w-4" />
-            </button>
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-white">TRANSACTION HISTORY</h3>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mt-1">
+              SHOWING {filteredPayments.length} OF {payments.length} PAYMENTS
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_160px_160px] gap-3 w-full lg:w-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-bullMuted" />
+              <input
+                type="text"
+                value={paymentSearchTerm}
+                onChange={(e) => setPaymentSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-[11px] outline outline-1 outline-bullBorder rounded-md bg-[#0a0a0a] text-white focus:outline-bullRed transition-all font-bold tracking-widest"
+                placeholder="SEARCH PAYMENTS..."
+              />
+            </div>
+            <select
+              value={methodFilter}
+              onChange={(e) => setMethodFilter(e.target.value)}
+              className="min-w-40 text-[11px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest"
+            >
+              <option value="All">ALL METHODS</option>
+              <option value="cash">CASH</option>
+              <option value="upi">UPI</option>
+              <option value="card">CARD</option>
+              <option value="bank_transfer">BANK TRANSFER</option>
+              <option value="other">OTHER</option>
+            </select>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="min-w-40 text-[11px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest"
+            >
+              <option value="All">ALL DATES</option>
+              <option value="Today">TODAY</option>
+              <option value="This Month">THIS MONTH</option>
+            </select>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -207,7 +253,7 @@ export const Finance: React.FC = () => {
             <tbody className="divide-y divide-bullBorder">
               {loading ? (
                 <tr><td colSpan={6} className="p-10 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-bullRed mx-auto" /></td></tr>
-              ) : payments.length === 0 ? (
+              ) : filteredPayments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-20 text-center">
                     <div className="flex flex-col items-center gap-4 text-bullMuted">
@@ -216,7 +262,7 @@ export const Finance: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : payments.map((p) => (
+              ) : filteredPayments.map((p) => (
                 <tr key={p.id} className="hover:bg-bullDark transition-colors">
                   <td className="px-6 py-5 whitespace-nowrap font-bold text-bullText text-sm">{p.members?.name || 'Unknown'}</td>
                   <td className="px-6 py-5 whitespace-nowrap text-sm font-medium text-bullMuted">{p.plan_name || '-'}</td>
