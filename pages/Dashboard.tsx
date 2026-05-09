@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { calculateStatus } from '../utils/statusUtils';
 import { toLocalIsoDate } from '../utils/dateUtils';
+import { OpenDoorButton } from '../components/OpenDoorButton';
 import {
   Users, UserCheck, AlertCircle, XCircle,
   TrendingUp, CalendarDays,
   Clock, CalendarClock, AlertOctagon, History,
-  UserPlus, CalendarOff, ArrowRight
+  UserPlus, CalendarOff, ArrowRight, DoorOpen
 } from 'lucide-react';
 
 const MONTHLY_GOAL = 200000; // ₹2L — change this to adjust the goal
@@ -270,6 +271,27 @@ export const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <p className="text-bullMuted uppercase text-[10px] font-bold tracking-widest">TOTAL PAYMENTS</p>
               <p className="text-2xl font-bold text-white">{revenueStats.paymentsCount}</p>
+            </div>
+          </div>
+
+          {/* Gate Control Card */}
+          <div className="bg-bullSurface rounded-xl outline outline-1 outline-bullBorder overflow-hidden">
+            <div className="px-6 pt-6 pb-2">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="p-2.5 rounded-full bg-emerald-500/10 outline outline-1 outline-bullBorder">
+                  <DoorOpen className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-sm uppercase tracking-widest">Gate Control</h3>
+                  <p className="text-bullMuted text-[11px] font-medium mt-0.5">Manually open the gym entrance door</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-5 pt-3">
+              <OpenDoorButton />
+              <p className="text-bullMuted text-[10px] text-center mt-3 font-medium tracking-wide">
+                Door will close automatically after 5 seconds
+              </p>
             </div>
           </div>
         </section>
