@@ -6,40 +6,20 @@ type ButtonState = 'idle' | 'loading' | 'success' | 'error';
 
 export const OpenDoorButton: React.FC = () => {
   const [state, setState] = useState<ButtonState>('idle');
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = still checking
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = still checking
 
-  // Check if the current user has admin role
+  // Check if the current user is authenticated
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAuth = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) {
-        setIsAdmin(false);
-        return;
+        setIsAuthenticated(false);
+      } else {
+        setIsAuthenticated(true);
       }
-
-      // Check the user's role from the profiles / user metadata
-      // First try user_metadata, then app_metadata, then query a profiles table
-      const role =
-        user.user_metadata?.role ||
-        user.app_metadata?.role ||
-        null;
-
-      if (role === 'admin') {
-        setIsAdmin(true);
-        return;
-      }
-
-      // Fallback: check a 'profiles' table if role not in metadata
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      setIsAdmin(profile?.role === 'admin');
     };
 
-    checkAdmin();
+    checkAuth();
   }, []);
 
   // Auto-reset after success/error
@@ -72,8 +52,8 @@ export const OpenDoorButton: React.FC = () => {
     }
   }, [state]);
 
-  // Don't render anything while checking or if not admin
-  if (isAdmin === null || isAdmin === false) return null;
+  // Don't render anything while checking or if not authenticated
+  if (isAuthenticated === null || isAuthenticated === false) return null;
 
   const config = {
     idle: {
