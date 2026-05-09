@@ -35,16 +35,12 @@ export const OpenDoorButton: React.FC = () => {
 
     setState('loading');
     try {
-      const response = await fetch('/api/gate/open', {
-        method: 'POST',
-      });
+      const { error } = await supabase
+        .from('gym_settings')
+        .update({ pending_door_open: true })
+        .eq('id', 1);
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to open door');
-      }
-
+      if (error) throw error;
       setState('success');
     } catch (err: any) {
       console.error('Door open failed:', err);
