@@ -11,7 +11,7 @@ export interface Member {
   emergency_contact?: string;
   pt_enquiry?: boolean;
   medical_condition?: string;
-  renewal_reminder?: boolean;
+  renewal_reminder?: string | null;
   created_at: string;
 }
 

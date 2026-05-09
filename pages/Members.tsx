@@ -276,7 +276,7 @@ export const Members: React.FC = () => {
         .from('members')
         .update({
           membership_end: newEndDateStr,
-          renewal_reminder: false
+          renewal_reminder: null
         })
         .eq('id', selectedMember.id);
 
@@ -298,7 +298,7 @@ export const Members: React.FC = () => {
       setIsRenewModalOpen(false);
       // Update member in-place so card doesn't jump position
       setMembers(prev => prev.map(m =>
-        m.id === selectedMember.id ? { ...m, membership_end: newEndDateStr, renewal_reminder: false } : m
+        m.id === selectedMember.id ? { ...m, membership_end: newEndDateStr, renewal_reminder: null } : m
       ));
     } catch (err) {
       showToast('Failed to renew.', 'error');
