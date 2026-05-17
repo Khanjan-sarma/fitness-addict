@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { toLocalIsoDate } from '../utils/dateUtils';
+import { DateInput } from '../components/DateInput';
 import { X, Trash2, CheckCircle, AlertCircle, Calendar, Clock } from 'lucide-react';
 
 // ── types ────────────────────────────────────────────────────────────
@@ -341,13 +342,11 @@ export const OffDays: React.FC = () => {
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
                     Start Date
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <DateInput
                     value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      if (endDate < e.target.value) setEndDate(e.target.value);
+                    onChange={(v) => {
+                      setStartDate(v);
+                      if (endDate < v) setEndDate(v);
                     }}
                     className="w-full bg-bullSurface rounded-xl px-4 py-3 text-sm font-bold text-white border-none focus:ring-2 focus:ring-bullRed transition-all"
                   />
@@ -356,12 +355,10 @@ export const OffDays: React.FC = () => {
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
                     End Date
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <DateInput
                     value={endDate}
+                    onChange={(v) => setEndDate(v)}
                     min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
                     className="w-full bg-bullSurface rounded-xl px-4 py-3 text-sm font-bold text-white border-none focus:ring-2 focus:ring-bullRed transition-all"
                   />
                 </div>

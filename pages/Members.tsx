@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { Member } from '../types';
 import { calculateStatus } from '../utils/statusUtils';
 import { addMonthsClamped, formatDate, toLocalIsoDate } from '../utils/dateUtils';
+import { DateInput } from '../components/DateInput';
 import {
   Search, UserPlus, Edit2, RefreshCw, X, Receipt,
   Trash2, CheckCircle, AlertCircle, Users, Phone, CreditCard,
@@ -68,7 +69,7 @@ const MemberCard: React.FC<{
 
       <div className="flex items-start mb-4">
         <div
-          className="w-10 h-10 rounded-lg bg-bullDark flex items-center justify-center font-black text-lg text-white outline outline-1 outline-bullBorder mr-3"
+          className="w-10 h-10 rounded-lg bg-bullDark flex items-center justify-center font-black text-lg text-white outline outline-1 outline-bullBorder mr-3 shrink-0"
         >
           {member.name.charAt(0)}
         </div>
@@ -151,6 +152,10 @@ export const Members: React.FC = () => {
   useEffect(() => {
     if (location.state && (location.state as any).memberAdded) {
       showToast('Member added successfully!', 'success');
+      window.history.replaceState({}, document.title);
+    }
+    if (location.state && (location.state as any).searchMember) {
+      setSearchTerm((location.state as any).searchMember);
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -571,12 +576,10 @@ export const Members: React.FC = () => {
             {renewDuration === 'custom' && (
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">NEW END DATE</label>
-                <input
-                  type="date"
+                <DateInput
                   value={renewCustomDate}
-                  onChange={e => setRenewCustomDate(e.target.value)}
+                  onChange={(v) => setRenewCustomDate(v)}
                   className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
-                  required
                 />
               </div>
             )}
@@ -766,28 +769,25 @@ export const Members: React.FC = () => {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">JOIN DATE</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={selectedMember.join_date}
-                    onChange={e => setSelectedMember({ ...selectedMember, join_date: e.target.value } as Member)}
+                    onChange={(v) => setSelectedMember({ ...selectedMember, join_date: v } as Member)}
                     className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-3 px-2 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">START</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={selectedMember.membership_start}
-                    onChange={e => setSelectedMember({ ...selectedMember, membership_start: e.target.value } as Member)}
+                    onChange={(v) => setSelectedMember({ ...selectedMember, membership_start: v } as Member)}
                     className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-3 px-2 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">END</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={selectedMember.membership_end}
-                    onChange={e => setSelectedMember({ ...selectedMember, membership_end: e.target.value } as Member)}
+                    onChange={(v) => setSelectedMember({ ...selectedMember, membership_end: v } as Member)}
                     className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-3 px-2 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
                   />
                 </div>
@@ -899,10 +899,9 @@ export const Members: React.FC = () => {
                         </div>
                         <div>
                           <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">DATE</label>
-                          <input
-                            type="date"
+                          <DateInput
                             value={editingPayment.paid_on}
-                            onChange={e => setEditingPayment({ ...editingPayment, paid_on: e.target.value })}
+                            onChange={(v) => setEditingPayment({ ...editingPayment, paid_on: v })}
                             className="w-full text-[13px] outline outline-1 outline-bullBorder rounded-md py-2 px-2 bg-[#111] text-white focus:outline-bullRed transition-all"
                           />
                         </div>

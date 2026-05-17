@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { 
@@ -16,7 +16,6 @@ const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/members', label: 'Members', icon: Users },
   { path: '/finance', label: 'Finance', icon: Landmark },
-  { path: '/off-days', label: 'Off Days', icon: CalendarOff },
 ];
 
 interface NavLinkProps {
@@ -55,6 +54,10 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

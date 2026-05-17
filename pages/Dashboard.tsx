@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { calculateStatus } from '../utils/statusUtils';
 import { toLocalIsoDate } from '../utils/dateUtils';
@@ -8,7 +8,7 @@ import {
   Users, UserCheck, AlertCircle, XCircle,
   TrendingUp, CalendarDays,
   Clock, CalendarClock, AlertOctagon, History,
-  UserPlus, CalendarOff, ArrowRight, DoorOpen
+  UserPlus, CalendarOff, ArrowRight, DoorOpen, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 const MONTHLY_GOAL = 200000; // ₹2L — change this to adjust the goal
@@ -84,7 +84,7 @@ export const Dashboard: React.FC = () => {
             acc.total += 1;
             const status = calculateStatus(member.membership_end);
             if (status === 'Active') acc.active += 1;
-            else if (status === 'Due') acc.due += 1;
+            else if (status === 'Due') { acc.due += 1; acc.active += 1; }
             else if (status === 'Expired') acc.expired += 1;
 
             if (member.membership_end) {
@@ -182,12 +182,6 @@ export const Dashboard: React.FC = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mt-2">
           <Link
-            to="/off-days"
-            className="px-6 py-3 bg-transparent border border-bullBorder rounded-md text-bullText font-bold hover:bg-bullSurface transition-all uppercase text-sm tracking-widest flex items-center"
-          >
-            <CalendarOff className="h-4 w-4 mr-2 opacity-70" /> MARK OFF DAY
-          </Link>
-          <Link
             to="/add-member"
             className="px-6 py-3 bg-bullRed rounded-md text-white font-bold hover:bg-red-700 transition-all uppercase text-sm tracking-widest flex items-center"
           >
@@ -221,14 +215,19 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Alerts Grid - Takes 2 cols */}
         <section className="xl:col-span-2 space-y-4">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-[0.2em] mb-4 pb-2 border-b border-bullRed inline-block">
-            MEMBERSHIP ALERTS
-          </h2>
+          <div className="flex items-center justify-between border-b border-bullRed pb-2">
+            <h2 className="text-[13px] font-black text-white uppercase tracking-[0.2em]">
+              MEMBERSHIP ALERTS
+            </h2>
+            <Link to="/members" className="text-bullRed font-bold text-xs uppercase tracking-widest flex items-center gap-1 group">
+              VIEW ALL <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <AlertBox title="DUE TODAY" items={alerts.today} themeColor="red" />
-            <AlertBox title="DUE TOMORROW" items={alerts.tomorrow} themeColor="red" />
-            <AlertBox title="DUE IN 3 DAYS" items={alerts.in3Days} themeColor="red" />
             <AlertBox title="EXPIRED 3+ DAYS AGO" items={alerts.ago3Days} themeColor="red" />
+            <AlertBox title="DUE TODAY" items={alerts.today} themeColor="orange" />
+            <AlertBox title="DUE TOMORROW" items={alerts.tomorrow} themeColor="amber" />
+            <AlertBox title="DUE IN 3 DAYS" items={alerts.in3Days} themeColor="yellow" />
           </div>
         </section>
 
@@ -300,41 +299,47 @@ export const Dashboard: React.FC = () => {
   );
 };
 
-const AlertBox = ({ title, items, themeColor = 'red' }: any) => {
-  const headerBg = themeColor === 'red' ? 'bg-red-500' : themeColor === 'orange' ? 'bg-orange-500' : 'bg-bullSurface';
-  const valBg = themeColor === 'red' ? 'bg-[#981014] text-white' : themeColor === 'orange' ? 'bg-orange-700 text-white' : 'bg-[#330000] text-bullRed';
-  
+const alertColorMap: Record<string, { badgeBg: string; borderColor: string }> = {
+  red: { badgeBg: 'bg-[#981014] text-white', borderColor: 'outline-red-500/30' },
+  orange: { badgeBg: 'bg-orange-700 text-white', borderColor: 'outline-orange-500/30' },
+  amber: { badgeBg: 'bg-amber-700 text-white', borderColor: 'outline-amber-500/30' },
+  yellow: { badgeBg: 'bg-yellow-700 text-white', borderColor: 'outline-yellow-500/30' },
+};
+
+const AlertBox = ({ title, items, themeColor = 'red' }: { title: string; items: AlertMember[]; themeColor?: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
+  const colors = alertColorMap[themeColor] || alertColorMap.red;
+
   return (
-    <div className={`rounded-xl overflow-hidden outline outline-1 outline-bullBorder bg-bullSurface flex flex-col h-[180px]`}>
-      <div className={`px-4 py-3 flex items-center justify-between ${headerBg}`}>
-        <div className="text-[11px] font-bold text-bullText tracking-widest uppercase">
-          {title}
+    <div className={`rounded-xl overflow-hidden outline outline-1 ${colors.borderColor} bg-bullSurface flex flex-col ${expanded ? 'h-auto max-h-[500px]' : 'h-[220px]'} transition-all duration-300`}>
+      <div className="px-4 py-3 flex items-center justify-between bg-red-600">
+        <div className="text-[11px] font-bold text-white tracking-widest uppercase">{title}</div>
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${colors.badgeBg}`}>{items.length}</span>
+          {items.length > 3 && (
+            <button onClick={() => setExpanded(!expanded)} className="text-white/80 hover:text-white transition-colors">
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          )}
         </div>
-        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${valBg}`}>
-          {items.length}
-        </span>
       </div>
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {items.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-bullMuted gap-2">
             <Users className="h-8 w-8 opacity-30 mt-2" />
             <span className="text-[10px] font-medium tracking-widest pt-2">No members</span>
-            <span className="text-[10px]">
-              {title === 'DUE TODAY' ? 'Great! No payments due today.' :
-               title === 'DUE TOMORROW' ? 'Great! No payments due tomorrow.' :
-               title === 'DUE IN 3 DAYS' ? 'No payments due in the next 3 days.' :
-               'No expired members.'}
-            </span>
           </div>
         ) : (
           <div className="divide-y divide-bullBorder">
-            {items.map((m: any) => (
-              <div key={m.id} className="p-4 hover:bg-bullDark transition-colors">
+            {items.map((m) => (
+              <div
+                key={m.id}
+                className="px-4 py-3 hover:bg-bullDark transition-colors cursor-pointer"
+                onClick={() => navigate('/members', { state: { searchMember: m.name } })}
+              >
                 <p className="text-sm font-bold text-bullText truncate">{m.name}</p>
-                <div className="flex justify-between items-center mt-1">
-                  <p className="text-[10px] text-bullMuted font-medium">{m.phone}</p>
-                  <p className="text-[10px] font-bold text-bullRed">{m.membership_end}</p>
-                </div>
+                <p className="text-[10px] text-bullMuted font-medium mt-1">{m.phone}</p>
               </div>
             ))}
           </div>

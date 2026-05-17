@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { addMonthsClamped, toLocalIsoDate } from '../utils/dateUtils';
@@ -48,19 +48,41 @@ const CustomDateInput = ({ id, name, value, onChange, readOnly, required, classN
     }
   };
 
+  const dateRef = useRef<HTMLInputElement>(null);
+
   return (
-    <input
-      type="text"
-      placeholder="DD/MM/YYYY"
-      id={id}
-      name={name}
-      value={displayValue}
-      onChange={handleTextChange}
-      readOnly={readOnly}
-      required={required}
-      className={className}
-      maxLength={10}
-    />
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="DD/MM/YYYY"
+        id={id}
+        name={name}
+        value={displayValue}
+        onChange={handleTextChange}
+        readOnly={readOnly}
+        required={required}
+        className={className}
+        maxLength={10}
+      />
+      {!readOnly && (
+        <>
+          <button
+            type="button"
+            onClick={() => dateRef.current?.showPicker()}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-bullMuted hover:text-white z-10"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </button>
+          <input
+            ref={dateRef}
+            type="date"
+            value={value}
+            onChange={(e) => onChange({ target: { name, value: e.target.value } } as any)}
+            className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
+          />
+        </>
+      )}
+    </div>
   );
 };
 

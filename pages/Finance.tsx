@@ -55,6 +55,7 @@ export const Finance: React.FC = () => {
   const [stats, setStats] = useState({
     total: 0,
     thisMonth: 0,
+    thisMonthCount: 0,
     count: 0,
     avg: 0
   });
@@ -80,6 +81,7 @@ export const Finance: React.FC = () => {
 
       let total = 0;
       let monthTotal = 0;
+      let monthCount = 0;
       const monthlyMap: Record<string, number> = {};
 
       data?.forEach(p => {
@@ -87,6 +89,7 @@ export const Finance: React.FC = () => {
         total += amt;
         if (p.payment_date?.startsWith(currentMonthStr)) {
           monthTotal += amt;
+          monthCount += 1;
         }
 
         if (p.payment_date) {
@@ -95,10 +98,11 @@ export const Finance: React.FC = () => {
         }
       });
 
-      // Prepare last 6 months for chart, filling zeros where no data exists
+      // Chart starts from April (financial year)
       const chartData = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(fyStartYear, 3 + i, 1); // 3 = April (0-indexed)
         const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         chartData.push({
           month: d.toLocaleString('en-US', { month: 'short' }),
@@ -110,6 +114,7 @@ export const Finance: React.FC = () => {
       setStats({
         total,
         thisMonth: monthTotal,
+        thisMonthCount: monthCount,
         count: data?.length || 0,
         avg: data?.length ? Math.round(total / data.length) : 0
       });
@@ -197,7 +202,7 @@ export const Finance: React.FC = () => {
         <FinanceCard label="LIFETIME REVENUE" value={formatCurrency(stats.total)} icon={<Landmark />} />
         <FinanceCard label="THIS MONTH" value={formatCurrency(stats.thisMonth)} icon={<DollarSign />} />
         <FinanceCard label="TRANSACTIONS" value={stats.count.toString()} icon={<CreditCard />} />
-        <FinanceCard label="AVG. TICKET" value={formatCurrency(stats.avg)} icon={<TrendingUp />} />
+        <FinanceCard label="TXN THIS MONTH" value={stats.thisMonthCount.toString()} icon={<TrendingUp />} />
       </section>
 
       {/* Analytics Preview */}
@@ -207,17 +212,17 @@ export const Finance: React.FC = () => {
             <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-3">
               <BarChart3 className="h-5 w-5 text-bullRed" /> MONTHLY REVENUE
             </h3>
-            <span className="text-[10px] font-bold text-bullMuted uppercase tracking-widest">LAST 6 MONTHS</span>
+            <span className="text-[10px] font-bold text-bullMuted uppercase tracking-widest">APR — MAR</span>
           </div>
 
-          <div className="h-64 flex flex-col justify-end">
+          <div className="h-80 flex flex-col justify-end">
             {stats.total === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-bullMuted gap-2 border border-dashed border-bullBorder rounded-lg">
                 <TrendingUp className="h-10 w-10 opacity-20" />
                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-50">NO FINANCIAL DATA</p>
               </div>
             ) : (
-              <div className="flex-1 flex items-end justify-between gap-4 relative">
+              <div className="flex-1 flex items-end justify-between gap-2 relative">
                 {/* Y-Axis lines */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                   {[4, 3, 2, 1, 0].map(i => (
@@ -229,15 +234,30 @@ export const Finance: React.FC = () => {
                 </div>
                 
                 <div className="flex-1 flex items-end justify-between px-10 h-[calc(100%-20px)] mt-5 z-10">
-                  {monthlyData.map((d, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-3 group relative h-full justify-end px-2">
-                      <div
-                        className="w-full bg-[#DE1B22] rounded-t-sm transition-all duration-700 ease-out max-w-[60px]"
-                        style={{ height: `${Math.max((d.revenue / maxRevenue) * 100, 2)}%` }}
-                      />
-                      <span className="text-[10px] font-bold text-bullMuted uppercase">{d.month}</span>
-                    </div>
-                  ))}
+                  {monthlyData.map((d, i) => {
+                    const currentMonthName = new Date().toLocaleString('en-US', { month: 'short' });
+                    const isCurrentMonth = d.month === currentMonthName;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-3 group relative h-full justify-end px-1">
+                        {/* Tooltip */}
+                        {d.revenue > 0 && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-bullDark text-[10px] font-bold px-2 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+                            ₹{(d.revenue / 1000).toFixed(1)}K
+                          </div>
+                        )}
+                        <div
+                          className={`w-full rounded-t-sm transition-all duration-700 ease-out max-w-[48px] ${isCurrentMonth ? 'shadow-[0_0_12px_rgba(222,27,34,0.5)]' : ''}`}
+                          style={{
+                            height: `${Math.max((d.revenue / maxRevenue) * 100, 2)}%`,
+                            background: isCurrentMonth
+                              ? 'linear-gradient(to top, #7f1d1d, #ef4444)'
+                              : 'linear-gradient(to top, #450a0a, #DE1B22)'
+                          }}
+                        />
+                        <span className={`text-[9px] font-bold uppercase ${isCurrentMonth ? 'text-bullRed' : 'text-bullMuted'}`}>{d.month}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -247,14 +267,15 @@ export const Finance: React.FC = () => {
 
       {/* Transactions Table */}
       <section className="bg-bullSurface rounded-xl outline outline-1 outline-bullBorder mt-10">
-        <div className="p-6 border-b border-bullBorder flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-black uppercase tracking-widest text-white">TRANSACTION HISTORY</h3>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mt-1">
-              SHOWING {filteredPayments.length} OF {payments.length} PAYMENTS
-            </p>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_160px_160px] gap-3 w-full lg:w-auto">
+        <div className="p-6 border-b border-bullBorder flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-white">TRANSACTION HISTORY</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted mt-1">
+                SHOWING {filteredPayments.length} OF {payments.length} PAYMENTS
+              </p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_160px_180px] gap-3 w-full lg:w-auto">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-bullMuted" />
               <input
@@ -282,14 +303,14 @@ export const Finance: React.FC = () => {
                 onClick={() => setShowDatePicker(!showDatePicker)}
                 className="w-full text-[11px] outline outline-1 outline-bullBorder rounded-md py-2 px-3 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all uppercase font-bold tracking-widest flex items-center justify-between gap-2"
               >
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-2 truncate">
                   <Calendar className="h-3.5 w-3.5 text-bullMuted" />
                   {dateMode === 'All' && 'ALL DATES'}
                   {dateMode === 'Today' && 'TODAY'}
                   {dateMode === 'This Cycle' && 'THIS CYCLE'}
                   {dateMode === 'Single' && singleDate && formatDate(singleDate)}
                   {dateMode === 'Single' && !singleDate && 'PICK DATE'}
-                  {dateMode === 'Range' && rangeStart && rangeEnd && `${formatDate(rangeStart)} - ${formatDate(rangeEnd)}`}
+                  {dateMode === 'Range' && rangeStart && rangeEnd && `${formatDate(rangeStart)} — ${formatDate(rangeEnd)}`}
                   {dateMode === 'Range' && (!rangeStart || !rangeEnd) && 'PICK RANGE'}
                 </span>
                 {dateMode !== 'All' && (
@@ -311,6 +332,13 @@ export const Finance: React.FC = () => {
               )}
             </div>
           </div>
+          </div>
+          {filteredPayments.length !== payments.length && (
+            <div className="bg-bullDark rounded-lg px-4 py-3 outline outline-1 outline-bullBorder flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">FILTERED TOTAL</span>
+              <span className="text-lg font-bold text-white">{formatCurrency(filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}</span>
+            </div>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
