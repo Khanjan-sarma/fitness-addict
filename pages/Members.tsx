@@ -4,6 +4,9 @@ import { supabase } from '../services/supabase';
 import { Member } from '../types';
 import { calculateStatus } from '../utils/statusUtils';
 import { addMonthsClamped, formatDate, toLocalIsoDate } from '../utils/dateUtils';
+import {
+  LAPSED_NOTICE, isLapsed, isTodayOrLater, suggestedRestartDate, describeGap
+} from '../utils/renewalPolicy';
 import { DateInput } from '../components/DateInput';
 import {
   Search, UserPlus, Edit2, RefreshCw, X, Receipt,
@@ -126,6 +129,10 @@ export const Members: React.FC = () => {
   const [renewAmount, setRenewAmount] = useState('1000');
   const [renewCustomDate, setRenewCustomDate] = useState('');
   const [renewPaymentMethod, setRenewPaymentMethod] = useState('cash');
+  // Lapsed-member handling: notice must be acknowledged before the form appears
+  const [renewIsLapsed, setRenewIsLapsed] = useState(false);
+  const [lapseAcknowledged, setLapseAcknowledged] = useState(false);
+  const [renewReason, setRenewReason] = useState('');
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -221,10 +228,22 @@ export const Members: React.FC = () => {
 
   // --- Modal Opening Handlers ---
   const handleRenew = (member: Member) => {
+    const lapsed = isLapsed(member.membership_end);
     setSelectedMember(member);
-    setRenewDuration('1');
-    setRenewAmount('1000');
-    setRenewCustomDate('');
+    setRenewReason('');
+    setRenewIsLapsed(lapsed);
+    setLapseAcknowledged(false);
+    if (lapsed) {
+      // No automatic date or amount for a long absence - both are decisions.
+      // The date is pre-filled as one month from today purely as a starting point.
+      setRenewDuration('custom');
+      setRenewCustomDate(suggestedRestartDate());
+      setRenewAmount('');
+    } else {
+      setRenewDuration('1');
+      setRenewCustomDate('');
+      setRenewAmount('1000');
+    }
     setIsRenewModalOpen(true);
   };
 
@@ -261,22 +280,63 @@ export const Members: React.FC = () => {
   const submitRenewal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMember) return;
+
+    // --- work out the new end date ---
+    let newEndDateStr: string;
+    if (renewDuration === 'custom') {
+      if (!renewCustomDate) {
+        showToast('Please choose the new end date.', 'error');
+        return;
+      }
+      newEndDateStr = renewCustomDate;
+    } else {
+      // Within the grace period we count from the old expiry, so the member
+      // keeps their billing day. Lapsed members never reach this branch -
+      // handleRenew forces them onto a manual date.
+      newEndDateStr = addMonthsClamped(selectedMember.membership_end, parseInt(renewDuration, 10));
+    }
+
+    // --- guard: a renewal must never leave a paying member locked out ---
+    if (!isTodayOrLater(newEndDateStr)) {
+      showToast(
+        `That end date (${formatDate(newEndDateStr)}) has already passed. Pick a date from today onwards.`,
+        'error'
+      );
+      return;
+    }
+
+    // --- guard: a renewal must record real money ---
+    const amountValue = parseFloat(renewAmount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      showToast('Enter the amount collected.', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      let newEndDateStr: string;
+      const planLabel = renewDuration === 'custom'
+        ? 'Custom'
+        : `${renewDuration} ${parseInt(renewDuration, 10) === 1 ? 'Month' : 'Months'}`;
 
-      if (renewDuration === 'custom') {
-        if (!renewCustomDate) {
-          showToast('Please select a custom end date.', 'error');
-          setSubmitting(false);
-          return;
-        }
-        newEndDateStr = renewCustomDate;
-      } else {
-        newEndDateStr = addMonthsClamped(selectedMember.membership_end, parseInt(renewDuration, 10));
-      }
+      const noteText = renewIsLapsed
+        ? `Returned after ${describeGap(selectedMember.membership_end)}` +
+          (renewReason.trim() ? ` - ${renewReason.trim()}` : '')
+        : (renewReason.trim() || null);
 
-      // Update membership_end, set renewal_reminder = false
+      // The payment is recorded BEFORE access is extended. If this step fails,
+      // nobody gets free time - that is the safe direction to fail in.
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert([{
+          member_id: selectedMember.id,
+          plan_name: planLabel,
+          amount: amountValue,
+          payment_date: toLocalIsoDate(),
+          payment_method: renewPaymentMethod,
+          note: noteText
+        }]);
+      if (paymentError) throw new Error(`Payment was not saved: ${paymentError.message}`);
+
       const { error: updateError } = await supabase
         .from('members')
         .update({
@@ -284,29 +344,20 @@ export const Members: React.FC = () => {
           renewal_reminder: null
         })
         .eq('id', selectedMember.id);
+      if (updateError) {
+        throw new Error(
+          `Payment saved, but the membership date did NOT update: ${updateError.message}. Please set the date again.`
+        );
+      }
 
-      if (updateError) throw updateError;
-
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert([{
-          member_id: selectedMember.id,
-          plan_name: `${renewDuration === 'custom' ? 'Custom' : renewDuration + (parseInt(renewDuration) === 1 ? ' Month' : ' Months')}`,
-          amount: parseFloat(renewAmount),
-          payment_date: toLocalIsoDate(),
-          payment_method: renewPaymentMethod
-        }]);
-
-      if (paymentError) throw paymentError;
-
-      showToast(`Renewed until ${newEndDateStr}`, 'success');
+      showToast(`Renewed until ${formatDate(newEndDateStr)}`, 'success');
       setIsRenewModalOpen(false);
       // Update member in-place so card doesn't jump position
       setMembers(prev => prev.map(m =>
         m.id === selectedMember.id ? { ...m, membership_end: newEndDateStr, renewal_reminder: null } : m
       ));
-    } catch (err) {
-      showToast('Failed to renew.', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to renew.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -548,7 +599,52 @@ export const Members: React.FC = () => {
       {/* Modals Container */}
       {isRenewModalOpen && selectedMember && (
         <Modal onClose={() => setIsRenewModalOpen(false)} title={`Renew - ${selectedMember.name}`}>
+          {renewIsLapsed && !lapseAcknowledged ? (
+            /* ===== LAPSED MEMBER - notice before any renewal ===== */
+            <div className="space-y-5">
+              <div className="flex items-start gap-3 border border-bullRed/30 bg-bullRed/10 rounded-md p-4">
+                <AlertTriangle className="h-5 w-5 text-bullRed flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-white uppercase tracking-wide">Membership lapsed</p>
+                  <p className="text-xs text-gray-300 leading-relaxed">{LAPSED_NOTICE}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">EXPIRED ON</span>
+                  <span className="text-sm font-bold text-white">{formatDate(selectedMember.membership_end)}</span>
+                </div>
+                <div className="flex items-center justify-between border border-bullBorder rounded-md px-4 py-3 bg-[#0a0a0a]">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-bullMuted">AWAY FOR</span>
+                  <span className="text-sm font-bold text-bullRed">{describeGap(selectedMember.membership_end)}</span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsRenewModalOpen(false)}
+                  className="flex-1 py-3 border border-bullBorder text-gray-300 rounded-md font-bold uppercase tracking-widest text-[11px] hover:bg-bullBorder/30 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLapseAcknowledged(true)}
+                  className="flex-1 py-3 bg-bullRed text-white rounded-md font-bold uppercase tracking-widest text-[11px] hover:bg-[#981014] transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : (
           <form onSubmit={submitRenewal} className="space-y-6">
+            {renewIsLapsed && (
+              <div className="text-[11px] text-gray-300 border border-bullRed/30 bg-bullRed/10 rounded-md px-4 py-3">
+                Returning after <span className="font-bold text-bullRed">{describeGap(selectedMember.membership_end)}</span>.
+                Set the end date manually.
+              </div>
+            )}
+            {!renewIsLapsed && (
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">DURATION</label>
               <select
@@ -573,13 +669,26 @@ export const Members: React.FC = () => {
                 <option value="custom">CUSTOM DATE</option>
               </select>
             </div>
-            {renewDuration === 'custom' && (
+            )}
+            {(renewDuration === 'custom' || renewIsLapsed) && (
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">NEW END DATE</label>
                 <DateInput
                   value={renewCustomDate}
                   onChange={(v) => setRenewCustomDate(v)}
                   className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                />
+              </div>
+            )}
+            {renewIsLapsed && (
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">REASON / NOTE</label>
+                <input
+                  type="text"
+                  value={renewReason}
+                  onChange={e => setRenewReason(e.target.value)}
+                  placeholder="e.g. was unwell, travelling, owner approved"
+                  className="w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white placeholder-gray-600 focus:outline-bullRed transition-all"
                 />
               </div>
             )}
@@ -615,6 +724,7 @@ export const Members: React.FC = () => {
               {submitting ? 'Processing...' : 'Confirm Renewal'}
             </button>
           </form>
+          )}
         </Modal>
       )}
 

@@ -65,9 +65,6 @@ export const Dashboard: React.FC = () => {
       if (membersResponse.error) throw membersResponse.error;
       if (paymentsResponse.error) throw paymentsResponse.error;
 
-      console.log('[Dashboard] Members:', membersResponse.data?.length, membersResponse.data);
-      console.log('[Dashboard] Payments:', paymentsResponse.data?.length, paymentsResponse.data);
-
       if (membersResponse.data) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);

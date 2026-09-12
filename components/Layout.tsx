@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { Member } from '../types';
+import { computeFlags, countBySeverity, PaymentRow } from '../utils/attentionChecks';
 import { 
   Dumbbell, LayoutDashboard, Users, LogOut, 
-  CalendarOff, Menu, X, Landmark, Settings 
+  CalendarOff, Menu, X, Landmark, Settings, AlertTriangle 
 } from 'lucide-react';
 
 interface NavItem {
@@ -15,6 +17,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/members', label: 'Members', icon: Users },
+  { path: '/attention', label: 'Attention', icon: AlertTriangle },
   { path: '/finance', label: 'Finance', icon: Landmark },
 ];
 
@@ -23,9 +26,10 @@ interface NavLinkProps {
   isMobile?: boolean;
   pathname: string;
   onCloseMobile?: () => void;
+  badge?: number;
 }
 
-const NavLink: React.FC<NavLinkProps> = ({ item, isMobile = false, pathname, onCloseMobile }) => {
+const NavLink: React.FC<NavLinkProps> = ({ item, isMobile = false, pathname, onCloseMobile, badge }) => {
   const Icon = item.icon;
   const isActive = pathname.startsWith(item.path);
   
@@ -46,6 +50,11 @@ const NavLink: React.FC<NavLinkProps> = ({ item, isMobile = false, pathname, onC
     >
       <Icon className={`h-5 w-5 mr-3 ${isActive ? 'text-bullRed' : 'opacity-70 group-hover:opacity-100'}`} />
       {item.label}
+      {badge && badge > 0 ? (
+        <span className="ml-auto min-w-[1.35rem] text-center text-[10px] font-black text-white bg-bullRed rounded-full px-1.5 py-0.5">
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 };
@@ -54,10 +63,32 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [attentionCount, setAttentionCount] = useState(0);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // Count only the "needs fixing now" items, so the badge means something.
+  // Fetched once per session; the Attention page re-checks on demand.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const [mRes, pRes] = await Promise.all([
+          supabase.from('members').select('id, member_id, name, phone, membership_start, membership_end'),
+          supabase.from('payments').select('member_id, amount, payment_date, plan_name')
+        ]);
+        if (cancelled || mRes.error || pRes.error) return;
+        const flags = computeFlags((mRes.data || []) as Member[], (pRes.data || []) as PaymentRow[]);
+        setAttentionCount(countBySeverity(flags).high);
+      } catch {
+        /* badge is cosmetic - never block the app on it */
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -89,6 +120,7 @@ export const Layout: React.FC = () => {
                 key={item.path} 
                 item={item} 
                 pathname={location.pathname} 
+                badge={item.path === '/attention' ? attentionCount : undefined}
               />
             ))}
           </nav>
@@ -170,6 +202,7 @@ export const Layout: React.FC = () => {
                   isMobile 
                   pathname={location.pathname}
                   onCloseMobile={() => setMobileMenuOpen(false)} 
+                  badge={item.path === '/attention' ? attentionCount : undefined}
                 />
               ))}
             </div>

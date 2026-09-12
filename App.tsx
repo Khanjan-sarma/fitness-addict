@@ -6,7 +6,10 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Members } from './pages/Members';
 import { AddMember } from './pages/AddMember';
-import { OffDays } from './pages/OffDays';
+import { Attention } from './pages/Attention';
+// Off Days was a v1 feature, removed in v2 at the owner's request. The page and
+// its `off_days` table no longer exist, so the route is disabled. The file is
+// kept in git history if it is ever brought back.
 import { Finance } from './pages/Finance';
 
 const App: React.FC = () => {
@@ -49,8 +52,8 @@ const App: React.FC = () => {
         >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/members" element={<Members />} />
+          <Route path="/attention" element={<Attention />} />
           <Route path="/add-member" element={<AddMember />} />
-          <Route path="/off-days" element={<OffDays />} />
           <Route path="/finance" element={<Finance />} />
         </Route>
 
