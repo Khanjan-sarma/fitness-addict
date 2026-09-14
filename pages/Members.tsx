@@ -361,10 +361,16 @@ export const Members: React.FC = () => {
       // Push the new date to the door terminal. Deliberately NOT awaited before
       // closing the modal - it takes a few seconds and the renewal is already
       // saved. If it fails, the nightly reconcile fixes it.
+      //
+      // The short delay matters: n8n re-reads the member from Supabase, and a
+      // call fired immediately after the update can still read the OLD row and
+      // conclude nothing needs changing. That happened on the first live test.
       const memberUuid = selectedMember.id;
-      syncMemberToDoor(memberUuid).then(result => {
-        showToast(result.message, result.ok ? 'success' : 'error');
-      });
+      setTimeout(() => {
+        syncMemberToDoor(memberUuid).then(result => {
+          showToast(result.message, result.ok ? 'success' : 'error');
+        });
+      }, 2000);
     } catch (err: any) {
       showToast(err?.message || 'Failed to renew.', 'error');
     } finally {
@@ -691,7 +697,9 @@ export const Members: React.FC = () => {
             )}
             {renewIsLapsed && (
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">REASON / NOTE</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-bullMuted block mb-2">
+                  REASON / NOTE <span className="text-gray-500 normal-case tracking-normal">(optional)</span>
+                </label>
                 <input
                   type="text"
                   value={renewReason}
