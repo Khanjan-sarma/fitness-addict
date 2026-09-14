@@ -64,12 +64,28 @@ export const checkId = (raw: string, taken: TakenMap): IdConflict => {
   const inCrm = taken.crm.get(k);
   const onDoor = taken.door.get(k);
 
+  // Used in both places. If the two names differ, this ID means DIFFERENT
+  // PEOPLE on each side - the dangerous case, and the point the receptionist
+  // needs to understand immediately.
   if (inCrm !== undefined && onDoor !== undefined) {
+    const sameName =
+      inCrm && onDoor &&
+      inCrm.toUpperCase().replace(/[^A-Z0-9]/g, '') === onDoor.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (sameName) {
+      return {
+        taken: true,
+        where: 'both',
+        holder: inCrm,
+        message: `This is already ${inCrm}'s ID.`
+      };
+    }
     return {
       taken: true,
       where: 'both',
       holder: inCrm || onDoor,
-      message: `Already used by ${inCrm || 'a member'} and on the door as ${onDoor || 'unnamed'}.`
+      message:
+        `Two different people already use this ID: member ${inCrm || '(no name)'}, ` +
+        `and ${onDoor || 'an unnamed record'} on the door. Pick a different one.`
     };
   }
   if (inCrm !== undefined) {
@@ -77,7 +93,7 @@ export const checkId = (raw: string, taken: TakenMap): IdConflict => {
       taken: true,
       where: 'crm',
       holder: inCrm,
-      message: `Already used by member ${inCrm || '(no name)'}.`
+      message: `This is already ${inCrm || '(no name)'}'s ID.`
     };
   }
   if (onDoor !== undefined) {
@@ -85,7 +101,7 @@ export const checkId = (raw: string, taken: TakenMap): IdConflict => {
       taken: true,
       where: 'door',
       holder: onDoor,
-      message: `Already on the door terminal as ${onDoor || 'an unnamed record'} - not a member yet. Using it would give two people one ID.`
+      message: `${onDoor || 'An unnamed record'} already uses this ID on the door, but is not a member. Using it would give two people one ID.`
     };
   }
   return { taken: false, where: null, holder: '', message: '' };
