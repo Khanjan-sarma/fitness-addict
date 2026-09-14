@@ -7,6 +7,7 @@ import { addMonthsClamped, formatDate, toLocalIsoDate } from '../utils/dateUtils
 import {
   LAPSED_NOTICE, isLapsed, isTodayOrLater, suggestedRestartDate, describeGap
 } from '../utils/renewalPolicy';
+import { syncMemberToDoor } from '../utils/syncDoor';
 import { DateInput } from '../components/DateInput';
 import {
   Search, UserPlus, Edit2, RefreshCw, X, Receipt,
@@ -356,6 +357,14 @@ export const Members: React.FC = () => {
       setMembers(prev => prev.map(m =>
         m.id === selectedMember.id ? { ...m, membership_end: newEndDateStr, renewal_reminder: null } : m
       ));
+
+      // Push the new date to the door terminal. Deliberately NOT awaited before
+      // closing the modal - it takes a few seconds and the renewal is already
+      // saved. If it fails, the nightly reconcile fixes it.
+      const memberUuid = selectedMember.id;
+      syncMemberToDoor(memberUuid).then(result => {
+        showToast(result.message, result.ok ? 'success' : 'error');
+      });
     } catch (err: any) {
       showToast(err?.message || 'Failed to renew.', 'error');
     } finally {
