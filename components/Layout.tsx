@@ -76,7 +76,7 @@ export const Layout: React.FC = () => {
     const run = async () => {
       try {
         const [mRes, pRes] = await Promise.all([
-          supabase.from('members').select('id, member_id, name, phone, membership_start, membership_end'),
+          supabase.from('members').select('id, member_id, name, phone, membership_start, membership_end, hik_person_id'),
           supabase.from('payments').select('member_id, amount, payment_date, plan_name')
         ]);
         if (cancelled || mRes.error || pRes.error) return;

@@ -91,6 +91,20 @@ export const computeFlags = (members: Member[], payments: PaymentRow[]): Flag[] 
 
     // ---------- HIGH ----------
 
+    // Paid, active, but has no record on the door terminal at all. They cannot
+    // get in, and no amount of syncing fixes it - a fingerprint can only be
+    // created with the person physically at the reader.
+    if (!expired && end && !m.hik_person_id) {
+      flags.push({
+        ...base,
+        code: 'not_enrolled',
+        severity: 'high',
+        title: 'Not enrolled at the door',
+        detail: `Paid until ${formatDate(end)} but has no fingerprint on the terminal, so cannot get in. Needs 30 seconds at the reader.`,
+        daysOwed: daysBetween(today, end)
+      });
+    }
+
     // Paid AFTER their membership had already ended, and it is still in the past.
     if (latest && expired && latest.payment_date > end) {
       flags.push({

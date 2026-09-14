@@ -27,7 +27,7 @@ export const Attention: React.FC = () => {
     setError(null);
     try {
       const [mRes, pRes] = await Promise.all([
-        supabase.from('members').select('id, member_id, name, phone, membership_start, membership_end'),
+        supabase.from('members').select('id, member_id, name, phone, membership_start, membership_end, hik_person_id'),
         supabase.from('payments').select('member_id, amount, payment_date, plan_name')
       ]);
       if (mRes.error) throw mRes.error;
@@ -161,7 +161,8 @@ export const Attention: React.FC = () => {
       })}
 
       <p className="text-[10px] font-bold uppercase tracking-widest text-bullMuted pt-2">
-        Door-related checks (not enrolled, no fingerprint, on the door but not a member)
+        Enrolment is read from each member's stored door link. Checks that need the
+        terminal itself (people on the door who are not members, ten-year windows)
         will appear here once the nightly device check is running.
       </p>
     </div>

@@ -12,6 +12,8 @@ export interface Member {
   pt_enquiry?: boolean;
   medical_condition?: string;
   renewal_reminder?: string | null;
+  /** Their record id on the door terminal. Null means not enrolled there. */
+  hik_person_id?: string | null;
   created_at: string;
 }
 
