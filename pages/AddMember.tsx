@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { addMonthsClamped, toLocalIsoDate } from '../utils/dateUtils';
+import {
+  buildTakenMap, checkId, suggestFreeIds, TakenMap, DeviceId
+} from '../utils/idCheck';
 import { AlertCircle } from 'lucide-react';
 
 const CustomDateInput = ({ id, name, value, onChange, readOnly, required, className }: any) => {
@@ -110,6 +113,36 @@ export const AddMember: React.FC = () => {
 
   const [ptEnquiry, setPtEnquiry] = useState(false);
 
+  // ---- member ID conflict checking -------------------------------------
+  // Loads ids already used by members AND ids in use on the door terminal.
+  // The second list matters: 73 device records belong to nobody in the CRM,
+  // and reusing one of those numbers gives two people the same ID.
+  const [taken, setTaken] = useState<TakenMap>({ crm: new Map(), door: new Map() });
+  const [idsLoaded, setIdsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [mRes, dRes] = await Promise.all([
+          supabase.from('members').select('member_id, name'),
+          supabase.from('hik_device_ids').select('employee_no, name')
+        ]);
+        if (cancelled) return;
+        // hik_device_ids may not exist yet - the member check still works
+        setTaken(buildTakenMap(mRes.data || [], (dRes.data || []) as DeviceId[]));
+        setIdsLoaded(true);
+      } catch {
+        /* never block adding a member because this lookup failed */
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const idConflict = checkId(formData.member_id, taken);
+  const freeIds = idsLoaded ? suggestFreeIds(taken, 5) : [];
+
   // Auto-calculate the end date and total amount when duration or start date changes
   useEffect(() => {
     if (duration !== 'custom' && formData.membership_start) {
@@ -162,12 +195,20 @@ export const AddMember: React.FC = () => {
       setError("Membership end date must be after the start date.");
       return;
     }
+    // Two people must never share one ID - it means the door can be opened by
+    // the wrong person and nothing looks wrong on screen.
+    if (idConflict.taken) {
+      setError(
+        `Member ID "${formData.member_id.trim()}" is already in use. ${idConflict.message}` +
+        (freeIds.length ? ` Try ${freeIds.slice(0, 3).join(', ')} instead.` : '')
+      );
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     let createdMemberId: string | null = null;
-
     try {
       // 1. Insert Member
       const insertData: any = {
@@ -252,10 +293,26 @@ export const AddMember: React.FC = () => {
                     id="member_id"
                     value={formData.member_id}
                     onChange={handleChange}
-                    className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                    className={`block w-full text-sm outline outline-1 rounded-md py-3 px-4 bg-[#0a0a0a] text-white transition-all ${
+                      idConflict.taken
+                        ? 'outline-bullRed focus:outline-bullRed'
+                        : 'outline-bullBorder focus:outline-bullRed'
+                    }`}
                     placeholder="E.G. BULL-001"
                   />
                 </div>
+                {idConflict.taken && (
+                  <p className="mt-2 text-[11px] font-bold text-bullRed flex items-start gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{idConflict.message}</span>
+                  </p>
+                )}
+                {!idConflict.taken && freeIds.length > 0 && (
+                  <p className="mt-2 text-[10px] font-bold text-bullMuted uppercase tracking-widest">
+                    Free to use here and at the terminal:{' '}
+                    <span className="text-emerald-400">{freeIds.join('  ·  ')}</span>
+                  </p>
+                )}
               </div>
 
               <div className="sm:col-span-1">
