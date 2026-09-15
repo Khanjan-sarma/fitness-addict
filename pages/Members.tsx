@@ -134,6 +134,10 @@ export const Members: React.FC = () => {
   const [renewIsLapsed, setRenewIsLapsed] = useState(false);
   const [lapseAcknowledged, setLapseAcknowledged] = useState(false);
   const [renewReason, setRenewReason] = useState('');
+  // The edit form's date picker mutates selectedMember in place, so the original
+  // value has to be captured when the modal opens - otherwise there is nothing to
+  // compare against and we cannot tell whether the door needs updating.
+  const [editOriginalEnd, setEditOriginalEnd] = useState('');
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -250,6 +254,7 @@ export const Members: React.FC = () => {
 
   const handleView = (member: Member) => {
     setSelectedMember(member);
+    setEditOriginalEnd(member.membership_end || '');
     setEditHasMedicalCondition(Boolean(member.medical_condition?.trim()));
     setIsEditMode(false);
     setIsEditModalOpen(true);
@@ -392,9 +397,28 @@ export const Members: React.FC = () => {
         .update(memberToUpdate)
         .eq('id', selectedMember.id);
       if (error) throw error;
+
+      // Unlike Renew, a past date IS allowed here - correcting a mistake or
+      // deliberately expiring someone are both legitimate. Whatever is saved,
+      // the door is told about it.
+      const newEnd = memberToUpdate.membership_end || '';
+      const dateChanged = newEnd !== editOriginalEnd;
+
       showToast('Member updated.', 'success');
       setIsEditModalOpen(false);
       fetchMembers();
+
+      // The end date can be changed from this form as well as from Renew, so the
+      // door has to be told here too. Without this, a corrected date looks right
+      // in the CRM while the terminal stays wrong - silently.
+      if (dateChanged) {
+        const memberUuid = selectedMember.id;
+        setTimeout(() => {
+          syncMemberToDoor(memberUuid).then(result => {
+            showToast(result.message, result.ok ? 'success' : 'error');
+          });
+        }, 2000);
+      }
     } catch (err) {
       showToast('Update failed.', 'error');
     } finally {
