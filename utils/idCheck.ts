@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Member ID conflict checking.
  *
  * An ID can already be taken in two places:
@@ -96,10 +96,26 @@ export interface TakenMap {
   crm: Map<string, string>;     // normalised member_id -> member name
   door: Map<string, string>;    // normalised employee_no -> device record name
   claimed: Map<string, string>; // normalised hik_person_id -> member who holds it
+  /** every member, kept so we can spot people who share a name */
+  members: MemberLite[];
 }
 
+export interface MemberLite {
+  member_id?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  membership_end?: string | null;
+  hik_person_id?: string | null;
+}
+
+/** last 10 digits, so 91xxxxxxxxxx and xxxxxxxxxx compare equal */
+export const normPhone = (s?: string | null): string => {
+  const d = String(s || '').replace(/\D/g, '');
+  return d.length > 10 ? d.slice(-10) : d;
+};
+
 export const buildTakenMap = (
-  members: { member_id?: string | null; name?: string | null; hik_person_id?: string | null }[],
+  members: MemberLite[],
   deviceIds: DeviceId[]
 ): TakenMap => {
   const crm = new Map<string, string>();
@@ -115,7 +131,52 @@ export const buildTakenMap = (
     const k = normId(d.employee_no || '');
     if (k) door.set(k, (d.name || '').trim());
   }
-  return { crm, door, claimed };
+  return { crm, door, claimed, members };
+};
+
+/* ------------------------------------------------------------------------ *
+ * People who share a name
+ *
+ * Only ONE case is worth interrupting the receptionist for: the same name AND
+ * the same phone number. That almost always means staff failed to find an
+ * existing member in search and are about to create a second record for one
+ * person.
+ *
+ * Same name with a different phone is a genuine namesake and needs no warning
+ * - there are 12 such pairs already and none of them share a phone, so a
+ * message there would fire constantly and teach staff to ignore warnings.
+ * ------------------------------------------------------------------------ */
+
+export interface NameClash {
+  kind: 'none' | 'likely_same_person';
+  others: MemberLite[];
+  message: string;
+}
+
+export const findNameClash = (rawName: string, rawPhone: string, taken: TakenMap): NameClash => {
+  const n = normName(rawName);
+  const phone = normPhone(rawPhone);
+  if (!n || n.length < 3 || !phone) return { kind: 'none', others: [], message: '' };
+
+  const sameBoth = taken.members.filter((m) => {
+    const mn = normName(m.name || '');
+    if (!mn) return false;
+    if (normPhone(m.phone) !== phone) return false;
+    return mn === n || dice(mn, n) >= 0.92;
+  });
+  if (sameBoth.length === 0) return { kind: 'none', others: [], message: '' };
+
+  const o = sameBoth[0];
+  const ends = (o.membership_end || '').slice(0, 10);
+  return {
+    kind: 'likely_same_person',
+    others: sameBoth,
+    message:
+      `${(o.name || '').trim()} already exists with this same phone number` +
+      (o.member_id ? ` (ID ${o.member_id})` : '') +
+      (ends ? `, membership to ${ends}` : '') +
+      `. This is very likely the same person - renew them instead of adding a second record.`
+  };
 };
 
 const none = (): IdConflict =>
@@ -147,9 +208,18 @@ export const checkId = (rawId: string, taken: TakenMap, rawName = ''): IdConflic
         };
       }
     }
+    // If the existing holder has the SAME name as the person being added, the
+    // old wording ("this is already KRISHNA MAZUMDAR's ID") read like
+    // confirmation to a receptionist adding a second Krishna Mazumdar. Say
+    // plainly that it is a different record.
+    const sameName = rawName && dice(inCrm, rawName) >= NAME_MATCH_MIN;
     return {
-      severity: 'block', where: 'crm', holder: inCrm, nameScore: 0, linkDeviceId: null,
-      message: `This is already ${inCrm || '(no name)'}'s ID.`
+      severity: 'block', where: 'crm', holder: inCrm, nameScore: sameName ? 1 : 0, linkDeviceId: null,
+      message: sameName
+        ? `An existing member record already uses this ID under the same name (${inCrm}). ` +
+          `If this is the same person, renew them instead. If it is a different person with ` +
+          `the same name, give them their own ID.`
+        : `This is already ${inCrm || '(no name)'}'s ID.`
     };
   }
 
@@ -203,3 +273,4 @@ export const suggestFreeIds = (taken: TakenMap, count = 5, limit = 4000): string
   }
   return out;
 };
+

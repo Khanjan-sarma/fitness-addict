@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { addMonthsClamped, toLocalIsoDate } from '../utils/dateUtils';
 import {
-  buildTakenMap, checkId, suggestFreeIds, isBlocked, TakenMap, DeviceId
+  buildTakenMap, checkId, suggestFreeIds, isBlocked, findNameClash, TakenMap, DeviceId
 } from '../utils/idCheck';
+import { syncMemberToDoor } from '../utils/syncDoor';
 import { AlertCircle } from 'lucide-react';
 
 const CustomDateInput = ({ id, name, value, onChange, readOnly, required, className }: any) => {
@@ -117,7 +118,7 @@ export const AddMember: React.FC = () => {
   // Loads ids already used by members AND ids in use on the door terminal.
   // The second list matters: 73 device records belong to nobody in the CRM,
   // and reusing one of those numbers gives two people the same ID.
-  const [taken, setTaken] = useState<TakenMap>({ crm: new Map(), door: new Map(), claimed: new Map() });
+  const [taken, setTaken] = useState<TakenMap>({ crm: new Map(), door: new Map(), claimed: new Map(), members: [] });
   const [idsLoaded, setIdsLoaded] = useState(false);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ export const AddMember: React.FC = () => {
     const load = async () => {
       try {
         const [mRes, dRes] = await Promise.all([
-          supabase.from('members').select('member_id, name, hik_person_id'),
+          supabase.from('members').select('member_id, name, phone, membership_end, hik_person_id'),
           supabase.from('hik_device_ids').select('employee_no, name')
         ]);
         if (cancelled) return;
@@ -145,6 +146,11 @@ export const AddMember: React.FC = () => {
   // they can tell a spelling variant from a different person.
   const [idConfirmed, setIdConfirmed] = useState(false);
   useEffect(() => { setIdConfirmed(false); }, [formData.member_id, formData.name]);
+  // People who share a name. Same name AND same phone almost always means
+  // staff failed to find an existing member and are creating a second record.
+  const nameClash = findNameClash(formData.name, formData.phone, taken);
+  const [dupConfirmed, setDupConfirmed] = useState(false);
+  useEffect(() => { setDupConfirmed(false); }, [formData.name, formData.phone]);
   const freeIds = idsLoaded ? suggestFreeIds(taken, 5) : [];
 
   // Auto-calculate the end date and total amount when duration or start date changes
@@ -211,6 +217,10 @@ export const AddMember: React.FC = () => {
       );
       return;
     }
+    if (nameClash.kind === 'likely_same_person' && !dupConfirmed) {
+      setError(`${nameClash.message} Tick the box under the name to add them anyway.`);
+      return;
+    }
     if (idConflict.severity === 'confirm' && !idConfirmed) {
       setError(`${idConflict.message} Tick the box under the ID field to confirm, or change the ID.`);
       return;
@@ -258,6 +268,15 @@ export const AddMember: React.FC = () => {
       }]);
 
       if (paymentError) throw paymentError;
+
+      // If this member was linked to a door record, their fingerprint is still
+      // carrying whatever window the terminal gave it - usually 2036. Push the
+      // real end date now rather than leaving them with a decade of access
+      // until the 03:00 reconcile picks it up.
+      if (idConflict.linkDeviceId) {
+        const newUuid = memberData.id;
+        setTimeout(() => { syncMemberToDoor(newUuid); }, 2000);
+      }
 
       navigate('/members', { state: { memberAdded: true } });
     } catch (err: any) {
@@ -377,10 +396,41 @@ export const AddMember: React.FC = () => {
                     required
                     value={formData.name}
                     onChange={handleChange}
-                    className="block w-full text-sm outline outline-1 outline-bullBorder rounded-md py-3 px-4 bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                    className={`block w-full text-sm outline outline-1 rounded-md py-3 px-4 bg-[#0a0a0a] text-white transition-all ${
+                      nameClash.kind === 'likely_same_person'
+                        ? 'outline-bullRed focus:outline-bullRed'
+                        : 'outline-bullBorder focus:outline-bullRed'
+                    }`}
                     placeholder="JOHN DOE"
                   />
                 </div>
+
+                {/* same name AND same phone - almost certainly a second record
+                    for somebody who already exists */}
+                {nameClash.kind === 'likely_same_person' && (
+                  <div className="mt-2">
+                    <p className="text-[11px] font-bold text-bullRed flex items-start gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                      <span>{nameClash.message}</span>
+                    </p>
+                    <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dupConfirmed}
+                        onChange={(e) => setDupConfirmed(e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 accent-bullRed"
+                      />
+                      <span className="text-[10px] font-bold text-bullMuted uppercase tracking-widest">
+                        I checked &mdash; this is a different person, add them
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {/* same name, different phone is a genuine namesake and is not
+                    flagged - 12 such pairs already exist and none share a
+                    phone, so warning there would just train staff to ignore
+                    warnings. */}
               </div>
 
               <div className="sm:col-span-1">
@@ -623,4 +673,7 @@ export const AddMember: React.FC = () => {
     </div>
   );
 };
+
+
+
 
