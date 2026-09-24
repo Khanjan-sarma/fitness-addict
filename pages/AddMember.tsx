@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { addMonthsClamped, toLocalIsoDate } from '../utils/dateUtils';
 import {
-  buildTakenMap, checkId, suggestFreeIds, TakenMap, DeviceId
+  buildTakenMap, checkId, suggestFreeIds, isBlocked, TakenMap, DeviceId
 } from '../utils/idCheck';
 import { AlertCircle } from 'lucide-react';
 
@@ -117,7 +117,7 @@ export const AddMember: React.FC = () => {
   // Loads ids already used by members AND ids in use on the door terminal.
   // The second list matters: 73 device records belong to nobody in the CRM,
   // and reusing one of those numbers gives two people the same ID.
-  const [taken, setTaken] = useState<TakenMap>({ crm: new Map(), door: new Map() });
+  const [taken, setTaken] = useState<TakenMap>({ crm: new Map(), door: new Map(), claimed: new Map() });
   const [idsLoaded, setIdsLoaded] = useState(false);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export const AddMember: React.FC = () => {
     const load = async () => {
       try {
         const [mRes, dRes] = await Promise.all([
-          supabase.from('members').select('member_id, name'),
+          supabase.from('members').select('member_id, name, hik_person_id'),
           supabase.from('hik_device_ids').select('employee_no, name')
         ]);
         if (cancelled) return;
@@ -140,7 +140,11 @@ export const AddMember: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const idConflict = checkId(formData.member_id, taken);
+  const idConflict = checkId(formData.member_id, taken, formData.name);
+  // Staff must tick this when the door record carries a different name. Only
+  // they can tell a spelling variant from a different person.
+  const [idConfirmed, setIdConfirmed] = useState(false);
+  useEffect(() => { setIdConfirmed(false); }, [formData.member_id, formData.name]);
   const freeIds = idsLoaded ? suggestFreeIds(taken, 5) : [];
 
   // Auto-calculate the end date and total amount when duration or start date changes
@@ -197,11 +201,18 @@ export const AddMember: React.FC = () => {
     }
     // Two people must never share one ID - it means the door can be opened by
     // the wrong person and nothing looks wrong on screen.
-    if (idConflict.taken) {
+    // Two people must never share one ID. But an ID that exists only on the
+    // door, under this same person's name, is not a clash - it is the record
+    // we are about to link to.
+    if (isBlocked(idConflict)) {
       setError(
         `Member ID "${formData.member_id.trim()}" is already in use. ${idConflict.message}` +
         (freeIds.length ? ` Try ${freeIds.slice(0, 3).join(', ')} instead.` : '')
       );
+      return;
+    }
+    if (idConflict.severity === 'confirm' && !idConfirmed) {
+      setError(`${idConflict.message} Tick the box under the ID field to confirm, or change the ID.`);
       return;
     }
 
@@ -223,6 +234,11 @@ export const AddMember: React.FC = () => {
       };
       if (formData.member_id.trim()) {
         insertData.member_id = formData.member_id.trim();
+      }
+      // Link to the door record now, so the nightly sync owns this member from
+      // the start instead of skipping them until someone repairs it by hand.
+      if (idConflict.linkDeviceId) {
+        insertData.hik_person_id = idConflict.linkDeviceId;
       }
 
       const { data: memberData, error: insertError } = await supabase.from('members').insert([
@@ -294,23 +310,57 @@ export const AddMember: React.FC = () => {
                     value={formData.member_id}
                     onChange={handleChange}
                     className={`block w-full text-sm outline outline-1 rounded-md py-3 px-4 bg-[#0a0a0a] text-white transition-all ${
-                      idConflict.taken
+                      idConflict.severity === 'block'
                         ? 'outline-bullRed focus:outline-bullRed'
-                        : 'outline-bullBorder focus:outline-bullRed'
+                        : idConflict.severity === 'confirm'
+                          ? 'outline-amber-500 focus:outline-amber-500'
+                          : 'outline-bullBorder focus:outline-bullRed'
                     }`}
                     placeholder="E.G. BULL-001"
                   />
                 </div>
-                {idConflict.taken && (
+
+                {/* a real duplicate - cannot proceed */}
+                {idConflict.severity === 'block' && (
                   <p className="mt-2 text-[11px] font-bold text-bullRed flex items-start gap-1.5">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
                     <span>{idConflict.message}</span>
                   </p>
                 )}
-                {!idConflict.taken && freeIds.length > 0 && (
+
+                {/* on the door under a different name - staff decide */}
+                {idConflict.severity === 'confirm' && (
+                  <div className="mt-2">
+                    <p className="text-[11px] font-bold text-amber-400 flex items-start gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                      <span>{idConflict.message}</span>
+                    </p>
+                    <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={idConfirmed}
+                        onChange={(e) => setIdConfirmed(e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 accent-amber-500"
+                      />
+                      <span className="text-[10px] font-bold text-bullMuted uppercase tracking-widest">
+                        Yes, this is the same person &mdash; use this ID
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {/* already enrolled at the door under this name - will be linked */}
+                {idConflict.severity === 'allow' && idConflict.linkDeviceId && (
+                  <p className="mt-2 text-[11px] font-bold text-emerald-400 flex items-start gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{idConflict.message}</span>
+                  </p>
+                )}
+
+                {idConflict.severity === 'allow' && !idConflict.linkDeviceId && freeIds.length > 0 && (
                   <p className="mt-2 text-[10px] font-bold text-bullMuted uppercase tracking-widest">
                     Free to use here and at the terminal:{' '}
-                    <span className="text-emerald-400">{freeIds.join('  ·  ')}</span>
+                    <span className="text-emerald-400">{freeIds.join('  Â·  ')}</span>
                   </p>
                 )}
               </div>
@@ -512,7 +562,7 @@ export const AddMember: React.FC = () => {
                 </label>
                 <div className="mt-1 relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-bullMuted text-sm font-bold">₹</span>
+                    <span className="text-bullMuted text-sm font-bold">â‚¹</span>
                   </div>
                   <input
                     type="number"
@@ -573,3 +623,4 @@ export const AddMember: React.FC = () => {
     </div>
   );
 };
+

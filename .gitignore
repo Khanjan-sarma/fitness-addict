@@ -28,3 +28,6 @@ dist-ssr
 
 .vercel
 .env*.local
+
+# local service_role key used by scripts/testIdCheck.mjs
+scripts/.sbkey
