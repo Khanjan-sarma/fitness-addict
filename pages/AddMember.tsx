@@ -379,7 +379,7 @@ export const AddMember: React.FC = () => {
                 {idConflict.severity === 'allow' && !idConflict.linkDeviceId && freeIds.length > 0 && (
                   <p className="mt-2 text-[10px] font-bold text-bullMuted uppercase tracking-widest">
                     Free to use here and at the terminal:{' '}
-                    <span className="text-emerald-400">{freeIds.join('  Â·  ')}</span>
+                    <span className="text-emerald-400">{freeIds.join(', ')}</span>
                   </p>
                 )}
               </div>
@@ -612,7 +612,7 @@ export const AddMember: React.FC = () => {
                 </label>
                 <div className="mt-1 relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-bullMuted text-sm font-bold">â‚¹</span>
+                    <span className="text-bullMuted text-sm font-bold">Rs</span>
                   </div>
                   <input
                     type="number"
@@ -623,7 +623,7 @@ export const AddMember: React.FC = () => {
                     required
                     value={totalAmount}
                     onChange={(e) => setTotalAmount(e.target.value)}
-                    className="block w-full text-sm pl-8 pr-4 py-3 outline outline-1 outline-bullBorder rounded-md bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
+                    className="block w-full text-sm pl-12 pr-4 py-3 outline outline-1 outline-bullBorder rounded-md bg-[#0a0a0a] text-white focus:outline-bullRed transition-all"
                     placeholder="E.G. 2000"
                   />
                 </div>
