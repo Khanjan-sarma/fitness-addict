@@ -14,7 +14,7 @@ import { supabase } from '../services/supabase';
  * re-derives every difference from scratch and fixes it.
  */
 
-const HOOK_URL = 'https://fitnessaddict.duckdns.org/webhook/hik-sync';
+const HOOK_URL = 'https://n8n.humicaai.xyz/webhook/hik-sync';
 
 export type DoorOutcome =
   | 'written_and_verified'
