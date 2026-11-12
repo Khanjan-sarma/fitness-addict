@@ -5,7 +5,7 @@ import { Member } from '../types';
 import { computeFlags, countBySeverity, PaymentRow } from '../utils/attentionChecks';
 import { 
   Dumbbell, LayoutDashboard, Users, LogOut, 
-  CalendarOff, Menu, X, Landmark, Settings, AlertTriangle 
+  CalendarOff, Menu, X, Landmark, Settings, AlertTriangle, AlertCircle 
 } from 'lucide-react';
 
 interface NavItem {
@@ -167,6 +167,16 @@ export const Layout: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {/* Subscription Warning Banner */}
+        <div className="bg-amber-950/60 border-b border-amber-500/30">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-10 py-2.5 flex items-center gap-3">
+            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+            <p className="text-xs font-semibold text-amber-300">
+              Your Humica AI CRM subscription ended on 05 Nov 2026. WhatsApp message facility will be stopped from 15th Nov if not paid. Please contact support to renew.
+            </p>
+          </div>
+        </div>
 
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-8 lg:p-10 max-w-[1600px] w-full mx-auto">
