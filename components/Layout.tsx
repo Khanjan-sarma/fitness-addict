@@ -168,12 +168,13 @@ export const Layout: React.FC = () => {
           </div>
         </header>
 
-        {/* Subscription Warning Banner */}
-        <div className="bg-amber-950/60 border-b border-amber-500/30">
+        {/* Service Stopped Banner */}
+        <div className="bg-red-950/90 border-b border-red-500/50 shadow-sm">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-10 py-2.5 flex items-center gap-3">
-            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
-            <p className="text-xs font-semibold text-amber-300">
-              Your Humica AI CRM subscription ended on 05 Nov 2026. WhatsApp message facility will be stopped from 15th Nov if not paid. Please contact support to renew.
+            <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+            <p className="text-xs font-semibold text-red-200">
+              <span className="font-bold text-red-400 uppercase tracking-wide mr-1.5">[Service Stopped]</span>
+              Your Humica AI CRM subscription ended on 05 Nov 2026. WhatsApp messaging service has been stopped. Please contact Humica AI support to renew.
             </p>
           </div>
         </div>
